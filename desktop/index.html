@@ -21,8 +21,8 @@
 <title>重生之我在破败家族力挽狂澜</title>
 <style>
 /* ==========================================================================
-   全局：柔和暖米手账风 v0.4.0 —— 手机优先（底部标签导航 + 多模块）
-   配色：原版美术主色提取（陶土软红/暖米灰/奶油粉）+ 柔和 UI 规范
+   全局：柔和暖米手账风 v0.7.0 —— 标准经营游戏布局
+   首屏=产业（每周净收益 + 产业列表），钱挂在顶栏，无独立主页仪表盘
    ========================================================================== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { height: 100%; }
@@ -44,53 +44,93 @@ body {
   #app { border-left: 1px solid #e9dcc6; border-right: 1px solid #e9dcc6; }
 }
 
-/* ---- 紧凑顶栏：标题 + 周数/行动点 ---- */
+/* ---- 顶栏：第一行标题+周数+结束本周；第二行资金芯片 ---- */
 header.m-head {
   position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; justify-content: space-between;
   background: linear-gradient(180deg, #fbf5e9, #f6ecda);
   border-bottom: 1px solid #e9dcc6;
-  padding: 10px 16px;
+  padding: 8px 12px 6px;
 }
-header .mh-title {
+.mh-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mh-title {
   font-family: "Kaiti SC", "KaiTi", serif;
-  font-size: 18px; font-weight: 900; color: #c96855; letter-spacing: 2px;
+  font-size: 17px; font-weight: 900; color: #c96855; letter-spacing: 2px;
+  white-space: nowrap; flex-shrink: 0;
 }
-header .mh-week { display: flex; align-items: center; gap: 8px; }
-header .mh-crisis {
+.mh-right { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+.mh-crisis {
   font-size: 11px; font-weight: bold; color: #b56a5c;
   background: #fbeae5; border: 1px solid #ecccc2;
-  border-radius: 999px; padding: 2px 9px;
+  border-radius: 999px; padding: 2px 8px; white-space: nowrap;
 }
-header .mh-crisis:empty { display: none; }
-header .mh-week .week {
+.mh-crisis:empty { display: none; }
+.mh-right .week {
   color: #fff; background: linear-gradient(180deg, #d8826f, #c96855);
-  font-weight: bold; font-size: 12px;
-  padding: 2px 12px; border-radius: 999px;
+  font-weight: bold; font-size: 12px; white-space: nowrap;
+  padding: 2px 10px; border-radius: 999px;
   box-shadow: 0 3px 8px rgba(207, 115, 97, .3);
 }
-header .mh-week .ap { font-size: 13px; color: #574a3f; }
-header .mh-week .ap b { color: #cf7361; letter-spacing: 2px; }
+.mh-right .ap { font-size: 13px; color: #574a3f; white-space: nowrap; }
+.mh-right .ap b { color: #cf7361; letter-spacing: 2px; }
+.endweek-mini {
+  font-size: 12px; font-weight: 900; color: #fff3e4;
+  background: linear-gradient(180deg, #d8826f, #c96855);
+  border: none; border-radius: 999px; padding: 5px 12px;
+  box-shadow: 0 3px 8px rgba(207, 115, 97, .35); cursor: pointer; white-space: nowrap;
+}
+.endweek-mini:active { transform: translateY(1px); }
 
-/* ---- 面板容器：每次只显示一个模块 ---- */
-.panel { display: none; padding: 14px 14px 20px; }
+/* 资金芯片行（现金/钱包/负债/产业） */
+.chips {
+  display: flex; gap: 6px; margin-top: 7px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;
+  background: #fdfaf3; border: 1px solid #e9dcc6; border-radius: 999px;
+  padding: 3px 12px; font-size: 12px; color: #9a8b77;
+  box-shadow: 0 2px 6px rgba(166, 138, 98, .12);
+}
+.chip b { color: #52463c; font-size: 13px; }
+.chip.warn b { color: #c4685a; }
+.chip.good b { color: #7a9a63; }
+
+/* ---- 面板容器 ---- */
+.panel { display: none; padding: 12px 14px 20px; }
 .panel.active { display: block; animation: panelIn .18s ease; }
 @keyframes panelIn {
   from { opacity: .4; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ---- 主页：父亲病房面板 ---- */
+/* ---- 产业首屏：每周净收益大字卡 ---- */
+.income-card {
+  background: linear-gradient(180deg, #d8826f, #c96855);
+  border-radius: 18px; color: #fff3e4;
+  padding: 14px 18px 12px; text-align: center;
+  box-shadow: 0 8px 20px rgba(207, 115, 97, .3);
+  margin-bottom: 12px;
+}
+.ic-label { font-size: 12px; letter-spacing: 4px; opacity: .9; }
+.ic-num { font-size: 34px; font-weight: 900; line-height: 1.3; }
+.ic-num.neg { color: #ffe1d6; }
+.ic-sub { font-size: 11px; opacity: .85; }
+
+/* 软属性条（声望/士气/魅力/员工/产品线/产业） */
+.stat-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.stat-strip .chip b { color: #52463c; }
+
+/* ---- 父亲面板（生活页顶部，紧凑） ---- */
 #dadPanel {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center; gap: 12px;
   margin-bottom: 12px; padding: 10px 14px 10px 10px;
   background: #fdfaf3; border: 1px solid #e9dcc6; border-radius: 18px;
   box-shadow: 0 6px 16px rgba(166, 138, 98, .14);
 }
 #dadImg {
-  width: 92px; height: 92px; object-fit: contain;
-  border-radius: 14px; background: #f7efe0;
-  flex-shrink: 0;
+  width: 84px; height: 84px; object-fit: contain;
+  border-radius: 14px; background: #f7efe0; flex-shrink: 0;
   animation: breathe 3.4s ease-in-out infinite;
 }
 @keyframes breathe {
@@ -98,85 +138,17 @@ header .mh-week .ap b { color: #cf7361; letter-spacing: 2px; }
   50% { transform: translateY(-4px); }
 }
 .dad-info { flex: 1; }
-.dad-name { font-weight: 900; font-size: 15px; margin-bottom: 2px; color: #574a3f; }
+.dad-name { font-weight: 900; font-size: 14px; margin-bottom: 2px; color: #574a3f; }
 .dad-name span { color: #cf7361; }
-#dadText { color: #9a8b77; font-size: 13px; margin-bottom: 6px; }
-.hpbar { height: 14px; border-radius: 999px; background: #f0e6d4; overflow: hidden; }
-#hpFill {
-  height: 100%; width: 50%;
-  background: linear-gradient(90deg, #e89a8a, #f2bcaa);
-  transition: width .3s;
-}
+#dadText { color: #9a8b77; font-size: 12px; margin-bottom: 5px; }
+.hpbar { height: 12px; border-radius: 999px; background: #f0e6d4; overflow: hidden; }
+#hpFill { height: 100%; width: 50%; background: linear-gradient(90deg, #e89a8a, #f2bcaa); transition: width .3s; }
 
-/* 道具栏 */
-#itemBar { margin-bottom: 12px; font-size: 13px; color: #9a8b77; }
-#itemBar b {
-  display: inline-block; margin-right: 8px; padding: 3px 12px;
-  background: #fdfaf3; border: 1px solid #e9dcc6; border-radius: 999px;
-  color: #6b5c4d; font-size: 12px;
-  box-shadow: 0 2px 6px rgba(166, 138, 98, .12);
-}
-#itemBar b.none { opacity: .45; }
-
-/* 数值卡：两列网格 */
-#stats {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 10px;
-  margin-bottom: 14px;
-}
-.stat {
-  position: relative;
-  background: #fdfaf3; border: 1px solid #e9dcc6; border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(166, 138, 98, .13);
-  padding: 11px 6px 8px; text-align: center;
-  overflow: hidden;
-}
-.stat::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
-  background: var(--ac, #cf7361); opacity: .75;
-}
-.stat .label { color: #9a8b77; font-size: 12px; margin-top: 3px; }
-.stat .value { color: #52463c; font-size: 16px; font-weight: 900; line-height: 1.4; }
-/* 迷你进度条（0~100 的属性用"条"代替纯数字，学自 Progress Knight） */
-.stat .sbar {
-  display: block; height: 5px; border-radius: 999px;
-  background: #f0e6d4; margin-top: 6px; overflow: hidden;
-}
-.stat .sbar b { display: block; height: 100%; width: 0; background: var(--ac, #cf7361); opacity: .8; transition: width .3s; }
-.stat.warn .sbar b { background: #cf7361; }
-.stat.warn { border-color: #e5b6ab; background: #fdf3ef; }
-.stat.warn .value { color: #c4685a; }
-.stat.good .value { color: #7a9a63; }
-.stat.flash .value { animation: statFlash .5s ease; }
-@keyframes statFlash {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.18); color: #cf7361; }
-  100% { transform: scale(1); }
-}
-
-/* 主页底部：结束本周大按钮 + 小按钮行 */
-.endweek-btn {
-  display: block; width: 100%; margin: 6px 0 10px; padding: 13px;
-  background: linear-gradient(180deg, #d8826f, #c96855);
-  color: #fff3e4; font-size: 17px; font-weight: 900; letter-spacing: 6px;
-  border: none; border-radius: 16px;
-  box-shadow: 0 6px 16px rgba(207, 115, 97, .35);
-  cursor: pointer;
-}
-.endweek-btn:active { transform: translateY(2px); box-shadow: 0 3px 8px rgba(207, 115, 97, .3); }
-.home-btnrow { display: flex; gap: 10px; }
-.home-btnrow button {
-  flex: 1; padding: 9px 4px; font-size: 12px; font-weight: bold;
-  background: #fdfaf3; color: #7a695a; border: 1px solid #e3d5be;
-  border-radius: 12px; cursor: pointer; white-space: nowrap;
-}
-.home-btnrow button:hover { background: #f7ead2; }
-.tip { color: #a3957f; font-size: 12px; margin-top: 10px; text-align: center; }
-
-/* ---- 行动分组：柔和标签 + 按钮左色条（与其他面板共用） ---- */
+/* ---- 行动分组与按钮 ---- */
 #panels h3 {
   display: inline-flex; align-items: center; gap: 6px;
   color: #fff; font-size: 13px; letter-spacing: 3px;
-  padding: 3px 16px; margin: 14px 0 8px;
+  padding: 3px 16px; margin: 12px 0 8px;
   border-radius: 999px;
   box-shadow: 0 3px 8px rgba(166, 138, 98, .25);
 }
@@ -202,14 +174,6 @@ header .mh-week .ap b { color: #cf7361; letter-spacing: 2px; }
   background: var(--ac, #f2e6cf); font-size: 16px;
   margin-right: 8px; vertical-align: middle;
 }
-.actbtn .hint {
-  display: none;                            /* 默认隐藏长说明，界面保持干净（v0.4.1） */
-  color: #a3957f; font-size: 11px; font-weight: normal;
-  margin-top: 4px; line-height: 1.55;
-}
-body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显示 */
-
-/* 一行式成本/收益标注（v0.5.1） */
 .actbtn .tok {
   float: right; margin-left: 8px; margin-top: 2px;
   font-size: 11px; font-weight: 900; padding: 1px 9px; border-radius: 999px;
@@ -218,20 +182,33 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
 .actbtn .tok.cost { background: #f2e6cf; color: #8a6f45; }
 .actbtn .tok.lack { background: #f6ded7; color: #b5574a; }
 .actbtn .tok.dim  { background: #f0ead9; color: #a3957f; }
+.actbtn .hint {
+  display: none;
+  color: #a3957f; font-size: 11px; font-weight: normal;
+  margin-top: 4px; line-height: 1.55;
+}
+body.show-hints .actbtn .hint { display: block; }
+
+/* 主页小按钮行（玩法/说明/重开，挂在产业页底部） */
+.home-btnrow { display: flex; gap: 10px; margin-top: 14px; }
+.home-btnrow button {
+  flex: 1; padding: 8px 4px; font-size: 12px; font-weight: bold;
+  background: #fdfaf3; color: #7a695a; border: 1px solid #e3d5be;
+  border-radius: 12px; cursor: pointer; white-space: nowrap;
+}
 
 /* ---- 手账页 ---- */
-#tab-log .panel-pad { padding: 0; }
 #logpanel {
   background: #fefbf4; border: 1px solid #e9dcc6; border-radius: 18px;
   box-shadow: 0 6px 16px rgba(166, 138, 98, .14);
-  padding: 12px 16px; height: calc(100vh - 190px); overflow-y: auto;
+  padding: 12px 16px; height: calc(100vh - 210px); overflow-y: auto;
   font-family: "Kaiti SC", "KaiTi", serif;
   font-size: 14px;
 }
 #logpanel p { margin: 3px 0; color: #6b5c4d; }
 #logpanel p.weekmark { color: #c0776b; font-weight: bold; margin-top: 10px; }
 
-/* ---- 底部标签栏（拇指可达） ---- */
+/* ---- 底部标签栏 ---- */
 #tabbar {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 560px; z-index: 30;
@@ -286,19 +263,47 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
 </head>
 <body>
 <div id="app">
-  <!-- 紧凑顶栏：标题 + 周数/行动点（所有模块共用） -->
+  <!-- 顶栏：标题/周数/危机/行动点/结束本周 + 资金芯片（标准经营布局） -->
   <header class="m-head">
-    <div class="mh-title">破败家族</div>
-    <div class="mh-week">
+    <div class="mh-row1">
+      <div class="mh-title">破败家族</div>
+      <div class="mh-right">
+        <span class="week" id="weekLabel">第 1 / 48 周</span>
+        <span class="ap" id="apLabel"></span>
+        <button id="btnEndWeek" class="endweek-mini">结束本周 ▶</button>
+      </div>
+    </div>
+    <div class="chips" id="moneyChips">
       <span class="mh-crisis" id="crisisChip"></span>
-      <span class="week" id="weekLabel">第 1 周</span>
-      <span class="ap" id="apLabel"></span>
+      <span class="chip" id="chipCash">💼 公司 <b>-</b></span>
+      <span class="chip" id="chipPocket">👛 钱包 <b>-</b></span>
+      <span class="chip" id="chipDebt">⛓️ 负债 <b>-</b></span>
+      <span class="chip" id="chipAsset">🏬 产业 <b>-</b></span>
     </div>
   </header>
 
   <main id="panels">
-    <!-- 模块一：主页（父亲 + 数值 + 结束本周） -->
-    <section id="tab-home" class="panel active">
+    <!-- 首屏：产业（每周净收益 + 产业列表） -->
+    <section id="tab-assets" class="panel active">
+      <div class="income-card">
+        <div class="ic-label">公司每周净流</div>
+        <div class="ic-num" id="weekNet">-</div>
+        <div class="ic-sub" id="weekNetSub"></div>
+      </div>
+      <div class="stat-strip" id="statStrip"></div>
+      <div id="actions-assets"></div>
+      <div class="home-btnrow">
+        <button id="btnHelp">📖 玩法</button>
+        <button id="btnHints">📝 说明:关</button>
+        <button id="btnRestart">🔄 重开</button>
+      </div>
+    </section>
+
+    <!-- 经营行动 -->
+    <section id="tab-biz" class="panel"><div id="actions-biz"></div></section>
+
+    <!-- 生活：父亲 + 家庭/人脉/投资/转账 -->
+    <section id="tab-life" class="panel">
       <div id="dadPanel">
         <img id="dadImg" src="../assets/dad_ok.png" alt="父亲">
         <div class="dad-info">
@@ -307,54 +312,23 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
           <div class="hpbar"><div id="hpFill"></div></div>
         </div>
       </div>
-      <div id="itemBar"></div>
-      <div id="stats">
-        <div class="stat" id="stCash"><div class="label">公司账户</div><div class="value">-</div></div>
-        <div class="stat" id="stPocket"><div class="label">个人钱包</div><div class="value">-</div></div>
-        <div class="stat" id="stDebt"><div class="label">家族负债</div><div class="value">-</div></div>
-        <div class="stat" id="stHealth"><div class="label">父亲健康</div><div class="value">-</div></div>
-        <div class="stat" id="stRep"><div class="label">声望</div><div class="value">-</div></div>
-        <div class="stat" id="stMorale"><div class="label">士气</div><div class="value">-</div></div>
-        <div class="stat" id="stCharm"><div class="label">魅力</div><div class="value">-</div></div>
-        <div class="stat" id="stStaff"><div class="label">员工</div><div class="value">-</div></div>
-        <div class="stat" id="stProduct"><div class="label">产品线</div><div class="value">-</div></div>
-        <div class="stat" id="stAsset"><div class="label">产业总值</div><div class="value">-</div></div>
-        <div class="stat" id="stEquip"><div class="label">设备/调查</div><div class="value">-</div></div>
-      </div>
-      <button id="btnEndWeek" class="endweek-btn">结束本周 ▶</button>
-      <div class="home-btnrow">
-        <button id="btnSave">💾 保存</button>
-        <button id="btnHints">📝 说明:关</button>
-        <button id="btnHelp">📖 玩法</button>
-        <button id="btnRestart">🔄 重开</button>
-      </div>
-      <p class="tip">每周 3 点行动点，用完点「结束本周」</p>
+      <div id="actions-life"></div>
     </section>
 
-    <!-- 模块二：经营（接订单/产品线/员工） -->
-    <section id="tab-biz" class="panel"><div id="actions-biz"></div></section>
-
-<!-- 模块三：产业（买资产，从摊子到物流园） -->
-    <section id="tab-assets" class="panel"><div id="actions-assets"></div></section>
-
-    <!-- 模块四：日常（家庭/人脉/投资/转账） -->
-    <section id="tab-daily" class="panel"><div id="actions-daily"></div></section>
-
-    <!-- 模块五：暗线（查真相/道具/金手指） -->
+    <!-- 暗线：查真相/道具/金手指 -->
     <section id="tab-secret" class="panel"><div id="actions-secret"></div></section>
 
-    <!-- 模块六：手账（全部日志） -->
+    <!-- 手账：全部日志 -->
     <section id="tab-log" class="panel">
       <div id="logpanel"></div>
     </section>
   </main>
 
-  <!-- 底部标签导航（拇指可达） -->
+  <!-- 底部标签导航 -->
   <nav id="tabbar">
-    <button class="tbtn active" data-tab="tab-home"><span class="ticon">🏡</span><span>主页</span></button>
+    <button class="tbtn active" data-tab="tab-assets"><span class="ticon">🏬</span><span>产业</span></button>
     <button class="tbtn" data-tab="tab-biz"><span class="ticon">🏭</span><span>经营</span></button>
-    <button class="tbtn" data-tab="tab-assets"><span class="ticon">🏬</span><span>产业</span></button>
-    <button class="tbtn" data-tab="tab-daily"><span class="ticon">🍵</span><span>日常</span></button>
+    <button class="tbtn" data-tab="tab-life"><span class="ticon">🍵</span><span>生活</span></button>
     <button class="tbtn" data-tab="tab-secret"><span class="ticon">🔍</span><span>暗线</span></button>
     <button class="tbtn" data-tab="tab-log"><span class="ticon">📒</span><span>手账</span></button>
   </nav>
@@ -364,8 +338,8 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
 <div id="overlay"><div class="dialog" id="dialog"></div></div>
 
 <!-- 共享引擎（顺序不能颠倒：先数据后引擎）。?v= 用于发布时强制刷新缓存 -->
-<script src="../core/data.js?v=060"></script>
-<script src="../core/engine.js?v=060"></script>
+<script src="../core/data.js?v=070"></script>
+<script src="../core/engine.js?v=070"></script>
 
 <script>
 /* ==========================================================================
@@ -459,44 +433,44 @@ function render() {
     $('hpFill').style.width = state.health + '%';
   }
 
-  // 道具栏：显示三种道具的持有数量
-  var it = state.items || {};
-  $('itemBar').innerHTML = '随身道具：'
-    + '<b' + (it.aid > 0 ? '' : ' class="none"') + '>🧰 急救箱 ×' + (it.aid || 0) + '</b>'
-    + '<b' + (it.invite > 0 ? '' : ' class="none"') + '>📨 商务邀请函 ×' + (it.invite || 0) + '</b>'
-    + '<b' + (it.chicken > 0 ? '' : ' class="none"') + '>⏱️ 时光怀表 ×' + (it.chicken || 0) + '</b>';
-
-  setStat('stCash', Engine.money(state.cash), state.cash < CONFIG.WEEKLY_WAGE * 2 ? 'warn' : '');
-  setStat('stPocket', Engine.money(state.pocket), state.pocket < CONFIG.MEDICAL_COST ? 'warn' : '');
-  setStat('stDebt', Engine.money(state.debt), state.debt > CONFIG.DEBT_CRUSH * 0.8 ? 'warn' : '');
-  // 父亲健康配一个表情：😄(健康) → 🙂(还行) → 😖(危急)，一眼看出状况
-  var face = state.health >= 70 ? '😄' : (state.health >= 40 ? '🙂' : '😖');
-  setStat('stHealth', face + ' ' + state.health, state.health <= 30 ? 'warn' : (state.health >= 70 ? 'good' : ''));
-  setStat('stRep', state.reputation + ' / 100', '');
-  setStat('stMorale', state.morale + ' / 100', state.morale <= 30 ? 'warn' : '');
-  setStat('stCharm', state.charm + ' / 100', '');
-  setStat('stStaff', (state.staff || 0) + ' / ' + CONFIG.STAFF_MAX, '');
-  setStat('stProduct', productLevelText(), '');
-  setStat('stEquip', 'Lv.' + state.equipment + ' · ' + state.investigation + '%', '');
-
-  // 产业总值：已购产业的花费总和（经营模拟的核心指标）
+  // 资金芯片（顶栏第二行）：经营模拟的四个核心数字
+  setChip('chipCash', Engine.money(state.cash), state.cash < CONFIG.WEEKLY_WAGE * 2 ? 'warn' : '');
+  setChip('chipPocket', Engine.money(state.pocket), state.pocket < CONFIG.MEDICAL_COST ? 'warn' : '');
+  setChip('chipDebt', Engine.money(state.debt), state.debt > CONFIG.DEBT_CRUSH * 0.8 ? 'warn' : '');
   var ownedVal = 0, totalVal = 0;
   for (var ai = 0; ai < ASSETS.length; ai++) {
     totalVal += ASSETS[ai].cost;
     if (state.assets[ASSETS[ai].id]) { ownedVal += ASSETS[ai].cost; }
   }
-  setStat('stAsset', Engine.money(ownedVal), ownedVal === totalVal && totalVal > 0 ? 'good' : '');
-  setBar('stAsset', totalVal ? ownedVal / totalVal * 100 : 0);
+  setChip('chipAsset', Engine.money(ownedVal), ownedVal === totalVal && totalVal > 0 ? 'good' : '');
 
-  // 迷你进度条：0~100 的属性用"条"读（学自 Progress Knight）
-  setBar('stHealth', state.health);
-  setBar('stRep', state.reputation);
-  setBar('stMorale', state.morale);
-  setBar('stCharm', state.charm);
-  setBar('stStaff', (state.staff || 0) / CONFIG.STAFF_MAX * 100);
-  var pt = 0; for (var pk in state.products) { if (state.products.hasOwnProperty(pk)) { pt += state.products[pk]; } }
-  setBar('stProduct', pt / 9 * 100);
-  setBar('stEquip', state.investigation);
+  // 软属性条（声望/士气/魅力/员工/产品线/调查）——产业页顶部
+  var strip = [
+    ['⭐ 声望', state.reputation + '/100'],
+    ['🔥 士气', state.morale + '/100'],
+    ['✨ 魅力', state.charm + '/100'],
+    ['🧑‍🏭 员工', (state.staff || 0) + '/' + CONFIG.STAFF_MAX],
+    ['📦 产品', productLevelText()],
+    ['🔧 设备', 'Lv.' + state.equipment],
+    ['🔍 调查', state.investigation + '%']
+  ];
+  var stripHtml = '';
+  for (var si = 0; si < strip.length; si++) {
+    stripHtml += '<span class="chip">' + strip[si][0] + ' <b>' + strip[si][1] + '</b></span>';
+  }
+  $('statStrip').innerHTML = stripHtml;
+
+  // 每周净流（经营模拟的"心跳"数字）：产业+自动订单-工资-利息-维护
+  var companyNet = Engine.assetWeeklyIncome(state)
+    + (state.assets.manager ? Engine.estimateOrder(state) : 0)
+    - CONFIG.WEEKLY_WAGE - (state.staff || 0) * CONFIG.STAFF_WEEKLY_WAGE
+    - Engine.productLevels(state) * CONFIG.PRODUCT_MAINTENANCE
+    - (state.debt > 0 && !state.flags.deferInterest
+        ? Math.round(state.debt * CONFIG.WEEKLY_INTEREST_RATE) : 0);
+  var netEl = $('weekNet');
+  netEl.textContent = (companyNet >= 0 ? '+' : '') + Engine.money(companyNet);
+  netEl.className = 'ic-num' + (companyNet < 0 ? ' neg' : '');
+  $('weekNetSub').textContent = '工资/利息/维护已计入 · 钱包 +' + money(CONFIG.WEEKLY_POCKET_SALARY) + '/周';
 
   renderActions();
   renderLog();
@@ -529,6 +503,13 @@ function setBar(id, pct) {
   bar.firstChild.style.width = Math.max(0, Math.min(100, pct)) + '%';
 }
 
+/** 更新资金芯片（顶栏第二行） */
+function setChip(id, text, cls) {
+  var el = $(id);
+  el.querySelector('b').textContent = text;
+  el.className = 'chip' + (cls ? ' ' + cls : '');
+}
+
 /** 更新单个数值卡片（图标注入 + 主题色 + 数值变化闪光） */
 function setStat(id, text, cls) {
   var el = $(id);
@@ -558,7 +539,7 @@ function setStat(id, text, cls) {
 var GROUP_TAB = {
   '经营': 'actions-biz', '产品线': 'actions-biz', '员工': 'actions-biz',
   '产业': 'actions-assets',
-  '家庭': 'actions-daily', '人脉': 'actions-daily', '投资': 'actions-daily', '转账': 'actions-daily',
+  '家庭': 'actions-life', '人脉': 'actions-life', '投资': 'actions-life', '转账': 'actions-life',
   '暗线': 'actions-secret', '道具': 'actions-secret', '金手指': 'actions-secret'
 };
 
@@ -636,7 +617,7 @@ function renderActions() {
   var boxes = {
     'actions-biz': $('actions-biz'),
     'actions-assets': $('actions-assets'),
-    'actions-daily': $('actions-daily'),
+    'actions-life': $('actions-life'),
     'actions-secret': $('actions-secret')
   };
   Object.keys(boxes).forEach(function (k) { boxes[k].innerHTML = ''; });
@@ -811,8 +792,8 @@ function startNew() {
 }
 
 /* ---- 顶部系统按钮 + 底部标签栏 ---------------------------------------- */
+/* 存档已自动化（每次操作后自动保存），不再需要手动保存按钮 */
 $('btnEndWeek').onclick = onEndWeek;
-$('btnSave').onclick = function () { saveGame(); alert('已保存。'); };
 $('btnHelp').onclick = showHelp;
 $('btnRestart').onclick = function () {
   if (confirm('确定放弃当前进度、重新开始吗？')) { startNew(); }
