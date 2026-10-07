@@ -318,6 +318,7 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
         <div class="stat" id="stCharm"><div class="label">魅力</div><div class="value">-</div></div>
         <div class="stat" id="stStaff"><div class="label">员工</div><div class="value">-</div></div>
         <div class="stat" id="stProduct"><div class="label">产品线</div><div class="value">-</div></div>
+        <div class="stat" id="stAsset"><div class="label">产业总值</div><div class="value">-</div></div>
         <div class="stat" id="stEquip"><div class="label">设备/调查</div><div class="value">-</div></div>
       </div>
       <button id="btnEndWeek" class="endweek-btn">结束本周 ▶</button>
@@ -333,13 +334,16 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
     <!-- 模块二：经营（接订单/产品线/员工） -->
     <section id="tab-biz" class="panel"><div id="actions-biz"></div></section>
 
-    <!-- 模块三：日常（家庭/人脉/投资/转账） -->
+<!-- 模块三：产业（买资产，从摊子到物流园） -->
+    <section id="tab-assets" class="panel"><div id="actions-assets"></div></section>
+
+    <!-- 模块四：日常（家庭/人脉/投资/转账） -->
     <section id="tab-daily" class="panel"><div id="actions-daily"></div></section>
 
-    <!-- 模块四：暗线（查真相/道具/金手指） -->
+    <!-- 模块五：暗线（查真相/道具/金手指） -->
     <section id="tab-secret" class="panel"><div id="actions-secret"></div></section>
 
-    <!-- 模块五：手账（全部日志） -->
+    <!-- 模块六：手账（全部日志） -->
     <section id="tab-log" class="panel">
       <div id="logpanel"></div>
     </section>
@@ -349,6 +353,7 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
   <nav id="tabbar">
     <button class="tbtn active" data-tab="tab-home"><span class="ticon">🏡</span><span>主页</span></button>
     <button class="tbtn" data-tab="tab-biz"><span class="ticon">🏭</span><span>经营</span></button>
+    <button class="tbtn" data-tab="tab-assets"><span class="ticon">🏬</span><span>产业</span></button>
     <button class="tbtn" data-tab="tab-daily"><span class="ticon">🍵</span><span>日常</span></button>
     <button class="tbtn" data-tab="tab-secret"><span class="ticon">🔍</span><span>暗线</span></button>
     <button class="tbtn" data-tab="tab-log"><span class="ticon">📒</span><span>手账</span></button>
@@ -359,8 +364,8 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
 <div id="overlay"><div class="dialog" id="dialog"></div></div>
 
 <!-- 共享引擎（顺序不能颠倒：先数据后引擎）。?v= 用于发布时强制刷新缓存 -->
-<script src="../core/data.js?v=051"></script>
-<script src="../core/engine.js?v=051"></script>
+<script src="../core/data.js?v=060"></script>
+<script src="../core/engine.js?v=060"></script>
 
 <script>
 /* ==========================================================================
@@ -379,6 +384,7 @@ var GROUP_COLORS = {
   '经营':   '#c99a4b',
   '产品线': '#6fa098',
   '员工':   '#c98b5e',
+  '产业':   '#4f8f7a',
   '债务':   '#c0776b',
   '转账':   '#7c99b8',
   '家庭':   '#8faf7e',
@@ -400,6 +406,7 @@ var STAT_META = {
   stCharm:  { icon: '✨', ac: '#d3939f' },
   stStaff:  { icon: '🧑‍🏭', ac: '#6fa098' },
   stProduct:{ icon: '📦', ac: '#9a85b8' },
+  stAsset:  { icon: '🏬', ac: '#4f8f7a' },
   stEquip:  { icon: '🔧', ac: '#96a86b' }
 };
 
@@ -434,15 +441,23 @@ function render() {
   for (var i = 0; i < CONFIG.AP_PER_WEEK; i++) { dots += (i < state.ap) ? '●' : '○'; }
   $('apLabel').innerHTML = '行动点 <b>' + dots + '</b>';
 
-  // 父亲病房面板：插画随健康分三档切换，配一句状态文案 + 血条式健康条
-  var tier = state.health >= 70 ? 'happy' : (state.health >= 40 ? 'ok' : 'sick');
-  $('dadImg').src = '../assets/dad_' + tier + '.png';
-  $('dadHpText').textContent = state.health + ' / 100';
-  $('dadText').textContent =
-    tier === 'happy' ? '今天精神不错，还念叨着要下床去车间看看。' :
-    tier === 'ok'    ? '病情平稳，每周的治疗一天都不能断。' :
-                       '咳嗽得厉害，夜里总睡不安——他需要更好的治疗。';
-  $('hpFill').style.width = state.health + '%';
+  // 父亲病房面板：插画随健康分三档切换 + 康复状态；配一句状态文案 + 血条
+  var tier = state.flags.dadRecovered ? 'recovered'
+    : (state.health >= 70 ? 'happy' : (state.health >= 40 ? 'ok' : 'sick'));
+  if (state.flags.dadRecovered) {
+    $('dadImg').src = '../assets/dad_happy.png';
+    $('dadHpText').textContent = '100 / 100 · 已康复 🎗️';
+    $('dadText').textContent = '疗程成功，父亲痊愈了。他每天去厂里转转，比谁都精神。';
+    $('hpFill').style.width = '100%';
+  } else {
+    $('dadImg').src = '../assets/dad_' + tier + '.png';
+    $('dadHpText').textContent = state.health + ' / 100';
+    $('dadText').textContent =
+      tier === 'happy' ? '今天精神不错，还念叨着要下床去车间看看。' :
+      tier === 'ok'    ? '病情平稳，每周的治疗一天都不能断。' :
+                         '咳嗽得厉害，夜里总睡不安——他需要更好的治疗。';
+    $('hpFill').style.width = state.health + '%';
+  }
 
   // 道具栏：显示三种道具的持有数量
   var it = state.items || {};
@@ -463,6 +478,15 @@ function render() {
   setStat('stStaff', (state.staff || 0) + ' / ' + CONFIG.STAFF_MAX, '');
   setStat('stProduct', productLevelText(), '');
   setStat('stEquip', 'Lv.' + state.equipment + ' · ' + state.investigation + '%', '');
+
+  // 产业总值：已购产业的花费总和（经营模拟的核心指标）
+  var ownedVal = 0, totalVal = 0;
+  for (var ai = 0; ai < ASSETS.length; ai++) {
+    totalVal += ASSETS[ai].cost;
+    if (state.assets[ASSETS[ai].id]) { ownedVal += ASSETS[ai].cost; }
+  }
+  setStat('stAsset', Engine.money(ownedVal), ownedVal === totalVal && totalVal > 0 ? 'good' : '');
+  setBar('stAsset', totalVal ? ownedVal / totalVal * 100 : 0);
 
   // 迷你进度条：0~100 的属性用"条"读（学自 Progress Knight）
   setBar('stHealth', state.health);
@@ -533,6 +557,7 @@ function setStat(id, text, cls) {
 /** 分组 → 底部标签 的归属（改分组名记得同步这里） */
 var GROUP_TAB = {
   '经营': 'actions-biz', '产品线': 'actions-biz', '员工': 'actions-biz',
+  '产业': 'actions-assets',
   '家庭': 'actions-daily', '人脉': 'actions-daily', '投资': 'actions-daily', '转账': 'actions-daily',
   '暗线': 'actions-secret', '道具': 'actions-secret', '金手指': 'actions-secret'
 };
@@ -585,6 +610,24 @@ function tokenFor(action) {
     case 'buy_chicken': return { text: money(C.CHICKEN_COST), cls: lackCash(C.CHICKEN_COST) ? 'lack' : 'cost' };
     case 'use_chicken': return (s.items.chicken > 0 && s.history.length > 0) ? { text: '可回溯', cls: 'gain' } : { text: '不可用', cls: 'dim' };
     case 'foresight':   return { text: '剩' + s.foresight + '次', cls: s.foresight > 0 ? 'gain' : 'dim' };
+    /* ---- 0.6.0 产业：已拥有显示"已拥有"，没钱的显示红价 ---- */
+    case 'buy_factory':
+    case 'buy_van':
+    case 'hire_manager':
+    case 'buy_clinic':
+    case 'buy_branch':
+    case 'buy_logistics': {
+      var aid2 = id.replace('buy_', '').replace('hire_manager', 'manager');
+      var as = Engine.findAsset(aid2);
+      if (s.assets[as.id]) { return { text: '已拥有', cls: 'dim' }; }
+      var wk = as.weekly ? (as.weekly > 0 ? '+' + money(as.weekly) + '/周' : money(as.weekly) + '/周') : '';
+      var cls2 = lackCash(as.cost) ? 'lack' : 'cost';
+      return { text: money(as.cost) + (wk ? ' · ' + wk : ''), cls: cls2 };
+    }
+    case 'recovery_course':
+      return s.flags.dadRecovered ? { text: '已康复', cls: 'gain' }
+        : (s.health < C.DAD_RECOVERY_HEALTH ? { text: '需健康' + C.DAD_RECOVERY_HEALTH, cls: 'dim' }
+        : { text: money(C.DAD_RECOVERY_COST), cls: lackCash(C.DAD_RECOVERY_COST) ? 'lack' : 'gain' });
     default:            return null;
   }
 }
@@ -592,6 +635,7 @@ function tokenFor(action) {
 function renderActions() {
   var boxes = {
     'actions-biz': $('actions-biz'),
+    'actions-assets': $('actions-assets'),
     'actions-daily': $('actions-daily'),
     'actions-secret': $('actions-secret')
   };

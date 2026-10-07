@@ -41,7 +41,7 @@ if (typeof CONFIG === 'undefined') {
   _data = {
     CONFIG: CONFIG, ACTIONS: ACTIONS, SPECIAL_ACTIONS: SPECIAL_ACTIONS,
     NO_AP_ACTIONS: NO_AP_ACTIONS, ACHIEVEMENTS: ACHIEVEMENTS,
-    PRODUCTS: PRODUCTS, AUCTION_WEEKS: AUCTION_WEEKS, AUCTION_EVENTS: AUCTION_EVENTS,
+    PRODUCTS: PRODUCTS, ASSETS: ASSETS, AUCTION_WEEKS: AUCTION_WEEKS, AUCTION_EVENTS: AUCTION_EVENTS,
     RANDOM_EVENTS: RANDOM_EVENTS, CRISIS_EVENTS: CRISIS_EVENTS,
     FORESIGHT_HINTS: FORESIGHT_HINTS, ENDINGS: ENDINGS
   };
@@ -52,6 +52,7 @@ var SPECIAL_ACTIONS = _data.SPECIAL_ACTIONS;
 var NO_AP_ACTIONS = _data.NO_AP_ACTIONS || {};
 var ACHIEVEMENTS  = _data.ACHIEVEMENTS || [];
 var PRODUCTS      = _data.PRODUCTS || [];
+var ASSETS        = _data.ASSETS || [];
 var AUCTION_WEEKS = _data.AUCTION_WEEKS || {};
 var AUCTION_EVENTS = _data.AUCTION_EVENTS || {};
 var RANDOM_EVENTS = _data.RANDOM_EVENTS;
@@ -61,6 +62,32 @@ var ENDINGS       = _data.ENDINGS;
 
 /** 属性上下限（0~100 的都夹在这个区间） */
 var STAT_MIN = 0, STAT_MAX = 100;
+
+/** 开局产业链：只有父亲留下的早点摊（0.6.0） */
+function buildStartingAssets() {
+  var a = {};
+  for (var i = 0; i < ASSETS.length; i++) { a[ASSETS[i].id] = 0; }
+  a.stall = 1;                    // 早点摊是起点，开局自带
+  return a;
+}
+
+/** 查找产业定义 */
+function findAsset(id) {
+  for (var i = 0; i < ASSETS.length; i++) {
+    if (ASSETS[i].id === id) { return ASSETS[i]; }
+  }
+  return null;
+}
+
+/** 产业每周净收益（正为收入，负为 upkeep，如经理周薪） */
+function assetWeeklyIncome(state) {
+  var sum = 0;
+  for (var i = 0; i < ASSETS.length; i++) {
+    var a = ASSETS[i];
+    if (state.assets[a.id]) { sum += (a.weekly || 0); }
+  }
+  return sum;
+}
 
 /* ===========================================================================
  * 一、工具函数
@@ -111,6 +138,7 @@ function newGame() {
     history: [],                  // 每周开局快照（时光怀表回溯用，最多存 2 条）
     products: { gua: 0, guan: 0, lihe: 0 },    // 产品线等级（0.3.0，各 0~3）
     staff: 0,                     // 员工人数（0.3.0，0~6）
+    assets: buildStartingAssets(),// 产业链（0.6.0）：早点摊起步，逐步买入
 
     flags: { achievements: {} },  // 剧情标记 + 已解锁成就（ achievements: {id:1} ）
     log: ['【第1周】你回到了一切开始前的那个夏天。老厂账上只有'
@@ -173,6 +201,7 @@ function canUseAction(state, actionId) {
       return { ok: true };
     case 'medical': {
       // 医疗费每周递增（病情加重），门槛是动态的，不能靠静态 need 声明
+      if (state.flags.dadRecovered) { return { ok: false, reason: '父亲已经康复，不需要治疗了' }; }
       var med = medicalCost(state);
       if (state.pocket < med) {
         return { ok: false, reason: '个人钱包不足（本周需要 ' + money(med) + '，可先转账）' };
@@ -224,6 +253,27 @@ function canUseAction(state, actionId) {
     case 'fire_staff':
       if (state.staff <= 0) { return { ok: false, reason: '厂里已经没有员工了' }; }
       return { ok: true };
+    case 'buy_factory':
+    case 'buy_van':
+    case 'hire_manager':
+    case 'buy_clinic':
+    case 'buy_branch':
+    case 'buy_logistics': {
+      var aid = actionId.replace('buy_', '').replace('hire_manager', 'manager');
+      var asset = findAsset(aid);
+      if (state.assets[asset.id]) { return { ok: false, reason: asset.name + ' 已经是你的了' }; }
+      return { ok: true };   // 资金门槛由 need.cash 通用检查兜底
+    }
+    case 'recovery_course': {
+      if (state.flags.dadRecovered) { return { ok: false, reason: '父亲已经康复了' }; }
+      if (state.health < CONFIG.DAD_RECOVERY_HEALTH) {
+        return { ok: false, reason: '健康需先达到 ' + CONFIG.DAD_RECOVERY_HEALTH + '（先稳定病情）' };
+      }
+      if (state.cash < CONFIG.DAD_RECOVERY_COST) {
+        return { ok: false, reason: '公司账户不足（需要 ' + money(CONFIG.DAD_RECOVERY_COST) + '）' };
+      }
+      return { ok: true };
+    }
     default:
       return { ok: true };
   }
@@ -268,6 +318,7 @@ function productLevels(state) {
 /**
  * 预估"接订单"的收益（v0.5.1 新增，学自增量游戏"按钮上直接标收益"）。
  * 接订单没有随机成分，所以预估值 = 实际值；供界面在按钮上标一行 token。
+ * v0.6.0：计入产业加成（食品厂 +15%、货车 +10%）。
  */
 function estimateOrder(state) {
   var gain = 20000 + state.reputation * 600 + state.morale * 100;
@@ -275,6 +326,7 @@ function estimateOrder(state) {
   if (inv > 0) { gain = gain * (1 + 0.3 * inv); }
   gain = gain * (1 + 0.25 * ((state.equipment || 1) - 1)) * (1 + (state.charm || 0) * 0.004);
   gain = gain * (1 + 0.15 * productLevels(state)) * (1 + 0.08 * (state.staff || 0));
+  gain = gain * (1 + 0.15 * (state.assets.factory ? 1 : 0)) * (1 + 0.10 * (state.assets.van ? 1 : 0));
   return Math.round(gain);
 }
 
@@ -317,7 +369,8 @@ function doSpecialAction(state, actionId, logs) {
 
     /* 接订单：收入 = (基础2万 + 声望×600 + 士气×100)
        × (1 + 原料×0.3) × (1 + (设备-1)×0.25) × (1 + 魅力×0.4%)
-       × (1 + 产品线总等级×0.15) × (1 + 员工×0.08)，每单消耗1份原料、6点士气 */
+       × (1 + 产品线总等级×0.15) × (1 + 员工×0.08)
+       × (1 + 食品厂×0.15) × (1 + 货车×0.10)，每单消耗1份原料、6点士气 */
     case 'order': {
       var gain = (20000 + state.reputation * 600 + state.morale * 100);
       if (state.inventory > 0) {
@@ -326,6 +379,7 @@ function doSpecialAction(state, actionId, logs) {
       }
       gain = Math.round(gain * (1 + 0.25 * (state.equipment - 1)) * (1 + state.charm * 0.004));
       gain = Math.round(gain * (1 + 0.15 * productLevels(state)) * (1 + 0.08 * (state.staff || 0)));
+      gain = Math.round(gain * (1 + 0.15 * (state.assets.factory ? 1 : 0)) * (1 + 0.10 * (state.assets.van ? 1 : 0)));
       state.cash += gain;
       state.morale = clamp(state.morale - 6, STAT_MIN, STAT_MAX);
       logs.push('📦 全厂赶工交付订单，进账 ' + money(gain) + '。');
@@ -467,6 +521,29 @@ function doSpecialAction(state, actionId, logs) {
       state.morale = clamp(state.morale - 8, STAT_MIN, STAT_MAX);
       state.reputation = clamp(state.reputation - 2, STAT_MIN, STAT_MAX);
       logs.push('📤 一名员工默默收拾了工具箱。剩下的工人们看着他的背影，没说话（士气 -8，声望 -2）。');
+      break;
+    }
+
+    /* ---- 0.6.0 产业链：买资产 ---- */
+    case 'buy_factory':
+    case 'buy_van':
+    case 'hire_manager':
+    case 'buy_clinic':
+    case 'buy_branch':
+    case 'buy_logistics': {
+      var bought = actionId.replace('buy_', '').replace('hire_manager', 'manager');
+      var asset = findAsset(bought);
+      state.cash -= asset.cost;
+      state.assets[asset.id] = 1;
+      logs.push(asset.icon + ' 「' + asset.name + '」到手！' + asset.desc);
+      break;
+    }
+    case 'recovery_course': {
+      state.cash -= CONFIG.DAD_RECOVERY_COST;
+      state.flags.dadRecovered = 1;
+      state.health = STAT_MAX;
+      state.morale = clamp(state.morale + 15, STAT_MIN, STAT_MAX);
+      logs.push('🎗️ 疗程结束，医生摘下口罩笑了："老爷子的指标全部正常。"\n父亲康复了——这场仗，你赢了。');
       break;
     }
 
@@ -633,8 +710,26 @@ function endWeek(state) {
     logs.push('🍬 产品线维护费 ' + money(maint) + '（产线等级 ' + productLevels(state) + '）。');
   }
 
-  /* 4) 医疗：本周没付医疗费 → 父亲健康下降 */
-  if (!state.flags.paidMedicalThisWeek) {
+  /* 3.6) 产业净收益 + 经理自动接单 + 理疗仪（0.6.0 产业链） */
+  var aIncome = assetWeeklyIncome(state);
+  if (aIncome !== 0) {
+    state.cash += aIncome;
+    logs.push((aIncome > 0 ? '🏬 产业周净入 ' + money(aIncome) + '。' : '🏬 产业净支出 ' + money(-aIncome) + '（经理周薪）。'));
+  }
+  if (state.assets.manager) {
+    var auto = estimateOrder(state);
+    state.cash += auto;
+    logs.push('🧑‍💼 经理替你接下一单，进账 ' + money(auto) + '。');
+  }
+  if (state.assets.clinic && state.health < STAT_MAX) {
+    state.health = clamp(state.health + (findAsset('clinic').heal || 4), STAT_MIN, STAT_MAX);
+    logs.push('🩺 理疗仪做完了本周的康复疗程（父亲健康 +4）。');
+  }
+
+  /* 4) 医疗：本周没付医疗费 → 父亲健康下降（康复后不再需要治疗） */
+  if (state.flags.dadRecovered) {
+    delete state.flags.paidMedicalThisWeek;      // 康复后每周结算不再检查医疗
+  } else if (!state.flags.paidMedicalThisWeek) {
     state.health = clamp(state.health - CONFIG.NO_MEDICAL_DAMAGE, STAT_MIN, STAT_MAX);
     logs.push('😔 这周没安排规范治疗，父亲的咳嗽又重了（健康 -' + CONFIG.NO_MEDICAL_DAMAGE + '）。');
   } else {
@@ -755,7 +850,8 @@ function pushSnapshot(state) {
     charm: state.charm, equipment: state.equipment, inventory: state.inventory,
     investigation: state.investigation, pendingIncome: state.pendingIncome,
     products: JSON.parse(JSON.stringify(state.products || {})),   // 0.3.0
-    staff: state.staff || 0                                        // 0.3.0
+    staff: state.staff || 0,                                       // 0.3.0
+    assets: JSON.parse(JSON.stringify(state.assets || {}))         // 0.6.0
   };
   state.history.push(snap);
   if (state.history.length > 2) { state.history.shift(); }
@@ -778,6 +874,7 @@ function restoreSnapshot(state, snap) {
   state.pendingIncome = snap.pendingIncome;
   state.products = JSON.parse(JSON.stringify(snap.products || { gua: 0, guan: 0, lihe: 0 }));
   state.staff = snap.staff || 0;
+  state.assets = JSON.parse(JSON.stringify(snap.assets || buildStartingAssets()));
   state.pendingEvent = null;
   state.ended = false;
   state.ending = null;
@@ -870,7 +967,9 @@ var Engine = {
   productLevels: productLevels,
   findProduct: findProduct,
   productCost: productCost,
-  estimateOrder: estimateOrder
+  estimateOrder: estimateOrder,
+  findAsset: findAsset,
+  assetWeeklyIncome: assetWeeklyIncome
 };
 
 if (typeof module !== 'undefined' && module.exports) {

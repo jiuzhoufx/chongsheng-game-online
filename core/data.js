@@ -24,7 +24,7 @@
  * 0. 全局配置 CONFIG
  * ------------------------------------------------------------------------ */
 var CONFIG = {
-  VERSION: '0.5.1',            // 当前数据版本（与 CHANGELOG 保持同步）
+  VERSION: '0.6.0',            // 当前数据版本（与 CHANGELOG 保持同步）
 
   MAX_WEEKS: 48,               // 一局 48 周（v0.5.0 由 24 翻倍）
   AP_PER_WEEK: 3,              // 每周行动点
@@ -67,7 +67,10 @@ var CONFIG = {
   MAX_INVENTORY: 3,            // 原料库存上限
   TRUTH_NEED: 100,             // 调查进度满值
   DEBT_CRUSH: 8000000,         // 终局"债台高筑"线
-  AUTO_BORROW_MULT: 2          // 账户透支自动借高利贷的惩罚倍率
+  AUTO_BORROW_MULT: 2,         // 账户透支自动借高利贷的惩罚倍率
+
+  DAD_RECOVERY_COST: 300000,   // "康复疗程"费用（救爸爸线的终点）
+  DAD_RECOVERY_HEALTH: 80      // 需要父亲健康达到该值才能开始疗程
 };
 
 /* ---------------------------------------------------------------------------
@@ -120,12 +123,35 @@ var ACTIONS = [
   { id: 'transfer_l', group: '转账', name: '转 20 万到钱包', icon: '🏧',
     desc: '10% 手续费。不耗行动点。', need: { cash: 200000 }, special: 'transfer_l' },
 
+  /* ===== 产业（v0.6.0）：一步步买资产，从摆摊到物流园 ===== */
+  { id: 'buy_factory', group: '产业', name: '赎回食品厂', icon: '🏭',
+    desc: '20 万赎回核心老厂：订单 +15%，周入 1.5 万。',
+    need: { cash: 200000 }, special: 'buy_factory' },
+  { id: 'buy_van', group: '产业', name: '买送货面包车', icon: '🚚',
+    desc: '8 万：订单 +10%。',
+    need: { cash: 80000 }, special: 'buy_van' },
+  { id: 'hire_manager', group: '产业', name: '聘请经理', icon: '🧑‍💼',
+    desc: '15 万：每周自动接一单（不耗行动点），周薪 3000。',
+    need: { cash: 150000 }, special: 'hire_manager' },
+  { id: 'buy_clinic', group: '产业', name: '买康复理疗仪', icon: '🩺',
+    desc: '25 万：父亲每周自动 +4 健康。',
+    need: { cash: 250000 }, special: 'buy_clinic' },
+  { id: 'buy_branch', group: '产业', name: '开城东分厂', icon: '🏬',
+    desc: '35 万：每周净入 3 万。',
+    need: { cash: 350000 }, special: 'buy_branch' },
+  { id: 'buy_logistics', group: '产业', name: '建冷库物流园', icon: '🚛',
+    desc: '80 万：每周净入 8 万，产业顶点。',
+    need: { cash: 800000 }, special: 'buy_logistics' },
+
   /* ===== 家庭 ===== */
   { id: 'care', group: '家庭', name: '陪护父亲', icon: '🫂',
     desc: '健康 +8，士气 +6。',
     effect: { health: 8, morale: 6, log: '父亲念叨起第一批果脯的味道。' } },
   { id: 'medical', group: '家庭', name: '支付医疗费', icon: '🏥',
     desc: '钱包支付，费用随周数上涨。健康 +18。', special: 'medical' },
+  { id: 'recovery_course', group: '家庭', name: '康复疗程', icon: '🎗️',
+    desc: '健康≥80 时可做：30 万根治父亲的病——他再也不需要治疗了。',
+    special: 'recovery_course' },
 
   /* ===== 人脉 ===== */
   { id: 'chamber', group: '人脉', name: '拜访商会', icon: '🏛️',
@@ -173,7 +199,9 @@ var SPECIAL_ACTIONS = {
   transfer_s: 1, transfer_l: 1, buy_chicken: 1,
   use_aid: 1, use_invite: 1, use_chicken: 1,
   develop_gua: 1, develop_guan: 1, develop_lihe: 1,
-  hire_staff: 1, fire_staff: 1
+  hire_staff: 1, fire_staff: 1,
+  buy_factory: 1, buy_van: 1, hire_manager: 1, buy_clinic: 1,
+  buy_branch: 1, buy_logistics: 1, recovery_course: 1
 };
 
 var NO_AP_ACTIONS = {
@@ -188,6 +216,25 @@ var PRODUCTS = [
   { id: 'gua',  name: '古法果脯', icon: '🍬', costBase: 60000,  desc: '爷爷的看家手艺。' },
   { id: 'guan', name: '果香罐头', icon: '🥫', costBase: 120000, desc: '走商超渠道。' },
   { id: 'lihe', name: '节庆礼盒', icon: '🎁', costBase: 250000, desc: '节日礼品市场。' }
+];
+
+/* ---------------------------------------------------------------------------
+ * 1.4 产业链 ASSETS（v0.6.0 新增）—— 一步步买资产的核心成长线
+ * ---------------------------------------------------------------------------
+ *   stall(早点摊) 开局就有：自己进货、自己跑街，周入 2000；
+ *   factory(食品厂) 赎回后订单收益 +15%；van(货车) +10%；
+ *   manager(经理) 花钱雇：每周自动替你接一单（不耗行动点，周薪 3000）；
+ *   clinic(理疗仪)：父亲每周自动 +4 健康——救爸爸的基建；
+ *   branch/logistics：躺着收钱的大资产。
+ * ------------------------------------------------------------------------- */
+var ASSETS = [
+  { id: 'stall',     name: '早点摊',     icon: '🏪', cost: 0,       weekly: 2000,   desc: '父亲留下的起点，自己进货自己卖。' },
+  { id: 'factory',   name: '建国食品厂', icon: '🏭', cost: 200000,  weekly: 15000,  orderBonus: 0.15, desc: '赎回核心老厂：订单收益 +15%。' },
+  { id: 'van',       name: '送货面包车', icon: '🚚', cost: 80000,   weekly: 0,      orderBonus: 0.10, desc: '送货快人一步：订单收益 +10%。' },
+  { id: 'manager',   name: '职业经理',   icon: '🧑‍💼', cost: 150000,  weekly: -3000,  autoOrder: true,  desc: '每周自动替你接一单（不耗行动点），周薪 3000。' },
+  { id: 'clinic',    name: '康复理疗仪', icon: '🩺', cost: 250000,  weekly: 0,      heal: 4,          desc: '装在家里：父亲每周自动 +4 健康。' },
+  { id: 'branch',    name: '城东分厂',   icon: '🏬', cost: 350000,  weekly: 30000,  desc: '第二家厂，每周净入 3 万。' },
+  { id: 'logistics', name: '冷库物流园', icon: '🚛', cost: 800000,  weekly: 80000,  desc: '产业顶点，每周净入 8 万。' }
 ];
 
 /** 拍卖会固定周（48 周长局共 6 场） */
@@ -222,7 +269,15 @@ var ACHIEVEMENTS = [
       return max > 0 && total >= max;
     } },
   { id: 'staff_full', name: '知人善任', desc: '员工满 6 人',
-    cond: function (s) { return s.staff >= 6; } }
+    cond: function (s) { return s.staff >= 6; } },
+  { id: 'dad_recovered', name: '爸爸康复了', desc: '完成康复疗程，根治父亲的病',
+    cond: function (s) { return s.flags.dadRecovered === 1; } },
+  { id: 'tycoon', name: '产业大亨', desc: '买下全部产业',
+    cond: function (s) {
+      if (!s.assets) { return false; }
+      for (var a in s.assets) { if (s.assets.hasOwnProperty(a) && !s.assets[a]) { return false; } }
+      return true;
+    } }
 ];
 
 /* ---------------------------------------------------------------------------
@@ -568,4 +623,4 @@ var ENDINGS = {
  * ------------------------------------------------------------------------- */
 
 /* 导出 */
-if (typeof module !== 'undefined' && module.exports) { module.exports = { CONFIG: CONFIG, ACTIONS: ACTIONS, SPECIAL_ACTIONS: SPECIAL_ACTIONS, NO_AP_ACTIONS: NO_AP_ACTIONS, ACHIEVEMENTS: ACHIEVEMENTS, PRODUCTS: PRODUCTS, AUCTION_WEEKS: AUCTION_WEEKS, AUCTION_EVENTS: AUCTION_EVENTS, RANDOM_EVENTS: RANDOM_EVENTS, CRISIS_EVENTS: CRISIS_EVENTS, FORESIGHT_HINTS: FORESIGHT_HINTS, ENDINGS: ENDINGS }; }
+if (typeof module !== 'undefined' && module.exports) { module.exports = { CONFIG: CONFIG, ACTIONS: ACTIONS, SPECIAL_ACTIONS: SPECIAL_ACTIONS, NO_AP_ACTIONS: NO_AP_ACTIONS, ACHIEVEMENTS: ACHIEVEMENTS, PRODUCTS: PRODUCTS, ASSETS: ASSETS, AUCTION_WEEKS: AUCTION_WEEKS, AUCTION_EVENTS: AUCTION_EVENTS, RANDOM_EVENTS: RANDOM_EVENTS, CRISIS_EVENTS: CRISIS_EVENTS, FORESIGHT_HINTS: FORESIGHT_HINTS, ENDINGS: ENDINGS }; }
