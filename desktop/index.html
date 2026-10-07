@@ -268,17 +268,17 @@ body.show-hints .actbtn .hint { display: block; }
     <div class="mh-row1">
       <div class="mh-title">破败家族</div>
       <div class="mh-right">
-        <span class="week" id="weekLabel">第 1 / 48 周</span>
-        <span class="ap" id="apLabel"></span>
+        <span class="week" id="weekLabel" title="当前周数">1/48周</span>
+        <span class="ap" id="apLabel" title="行动点"></span>
         <button id="btnEndWeek" class="endweek-mini">结束本周 ▶</button>
       </div>
     </div>
     <div class="chips" id="moneyChips">
-      <span class="mh-crisis" id="crisisChip"></span>
-      <span class="chip" id="chipCash">💼 公司 <b>-</b></span>
-      <span class="chip" id="chipPocket">👛 钱包 <b>-</b></span>
-      <span class="chip" id="chipDebt">⛓️ 负债 <b>-</b></span>
-      <span class="chip" id="chipAsset">🏬 产业 <b>-</b></span>
+      <span class="mh-crisis" id="crisisChip" title="下一场危机倒计时"></span>
+      <span class="chip" id="chipCash" title="公司账户">💼 <b>-</b></span>
+      <span class="chip" id="chipPocket" title="个人钱包">👛 <b>-</b></span>
+      <span class="chip" id="chipDebt" title="家族负债">⛓️ <b>-</b></span>
+      <span class="chip" id="chipAsset" title="产业总值">🏬 <b>-</b></span>
     </div>
   </header>
 
@@ -286,7 +286,6 @@ body.show-hints .actbtn .hint { display: block; }
     <!-- 首屏：产业（每周净收益 + 产业列表） -->
     <section id="tab-assets" class="panel active">
       <div class="income-card">
-        <div class="ic-label">公司每周净流</div>
         <div class="ic-num" id="weekNet">-</div>
         <div class="ic-sub" id="weekNetSub"></div>
       </div>
@@ -404,16 +403,17 @@ function loadGame() {
 
 /* ---- 渲染：状态栏 ------------------------------------------------------ */
 function render() {
-  $('weekLabel').textContent = '第 ' + Math.min(state.week, CONFIG.MAX_WEEKS) + ' / ' + CONFIG.MAX_WEEKS + ' 周';
+  // 全部"图标+数字"（v0.7.1 文字再瘦身），名字靠悬停提示
+  $('weekLabel').textContent = Math.min(state.week, CONFIG.MAX_WEEKS) + '/' + CONFIG.MAX_WEEKS + '周';
 
   // 危机倒计时提示（学自开源文字游戏的常驻关键信息条）
   var nc = Engine.nextCrisisWeek(state);
-  $('crisisChip').textContent = nc ? '⚠ 危机 ' + nc + ' 周' : '';
+  $('crisisChip').textContent = nc ? '⚠' + nc + '周' : '';
 
   // 行动点用圆点表示：●●○
   var dots = '';
   for (var i = 0; i < CONFIG.AP_PER_WEEK; i++) { dots += (i < state.ap) ? '●' : '○'; }
-  $('apLabel').innerHTML = '行动点 <b>' + dots + '</b>';
+  $('apLabel').innerHTML = '<b>' + dots + '</b>';
 
   // 父亲病房面板：插画随健康分三档切换 + 康复状态；配一句状态文案 + 血条
   var tier = state.flags.dadRecovered ? 'recovered'
@@ -433,7 +433,7 @@ function render() {
     $('hpFill').style.width = state.health + '%';
   }
 
-  // 资金芯片（顶栏第二行）：经营模拟的四个核心数字
+  // 资金芯片（顶栏第二行）：图标+数字
   setChip('chipCash', Engine.money(state.cash), state.cash < CONFIG.WEEKLY_WAGE * 2 ? 'warn' : '');
   setChip('chipPocket', Engine.money(state.pocket), state.pocket < CONFIG.MEDICAL_COST ? 'warn' : '');
   setChip('chipDebt', Engine.money(state.debt), state.debt > CONFIG.DEBT_CRUSH * 0.8 ? 'warn' : '');
@@ -444,19 +444,20 @@ function render() {
   }
   setChip('chipAsset', Engine.money(ownedVal), ownedVal === totalVal && totalVal > 0 ? 'good' : '');
 
-  // 软属性条（声望/士气/魅力/员工/产品线/调查）——产业页顶部
+  // 软属性条：图标+数字（名字看悬停提示）
   var strip = [
-    ['⭐ 声望', state.reputation + '/100'],
-    ['🔥 士气', state.morale + '/100'],
-    ['✨ 魅力', state.charm + '/100'],
-    ['🧑‍🏭 员工', (state.staff || 0) + '/' + CONFIG.STAFF_MAX],
-    ['📦 产品', productLevelText()],
-    ['🔧 设备', 'Lv.' + state.equipment],
-    ['🔍 调查', state.investigation + '%']
+    ['⭐', state.reputation, '声望'],
+    ['🔥', state.morale, '士气'],
+    ['✨', state.charm, '魅力'],
+    ['🧑‍🏭', (state.staff || 0) + '/' + CONFIG.STAFF_MAX, '员工'],
+    ['📦', productLevelText(), '产品线'],
+    ['🔧', 'Lv.' + state.equipment, '设备'],
+    ['🔍', state.investigation + '%', '调查进度']
   ];
   var stripHtml = '';
   for (var si = 0; si < strip.length; si++) {
-    stripHtml += '<span class="chip">' + strip[si][0] + ' <b>' + strip[si][1] + '</b></span>';
+    stripHtml += '<span class="chip" title="' + strip[si][2] + '">' + strip[si][0]
+      + ' <b>' + strip[si][1] + '</b></span>';
   }
   $('statStrip').innerHTML = stripHtml;
 
@@ -470,7 +471,7 @@ function render() {
   var netEl = $('weekNet');
   netEl.textContent = (companyNet >= 0 ? '+' : '') + Engine.money(companyNet);
   netEl.className = 'ic-num' + (companyNet < 0 ? ' neg' : '');
-  $('weekNetSub').textContent = '工资/利息/维护已计入 · 钱包 +' + money(CONFIG.WEEKLY_POCKET_SALARY) + '/周';
+  $('weekNetSub').textContent = '每周 · 钱包 +' + money(CONFIG.WEEKLY_POCKET_SALARY);
 
   renderActions();
   renderLog();
