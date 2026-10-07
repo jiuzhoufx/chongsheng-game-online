@@ -1,0 +1,13 @@
+{
+  "name": "重生之我在破败家族力挽狂澜",
+  "short_name": "破败家族",
+  "description": "文字经营 · 多结局 · 24 周改写家族命运",
+  "start_url": "./desktop/index.html",
+  "display": "standalone",
+  "background_color": "#f6eee0",
+  "theme_color": "#cf7361",
+  "icons": [
+    { "src": "dad_ok.png", "sizes": "480x480", "type": "image/png", "purpose": "any" },
+    { "src": "dad_happy.png", "sizes": "480x480", "type": "image/png", "purpose": "maskable" }
+  ]
+}

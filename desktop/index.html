@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<!-- ==========================================================================
+  《重生之我在破败家族力挽狂澜》桌面版入口
+  ----------------------------------------------------------------------------
+  怎么玩：直接双击本文件（index.html），用浏览器打开即可，无需安装任何东西。
+  注意：本文件依赖 ../core/ 目录里的 data.js 和 engine.js 与 ../assets/ 插画，
+        请不要单独把本文件移出项目文件夹。
+
+  文件结构：样式表 → 页面骨架（双栏：左主区/右手账） → 引擎加载 → 界面逻辑
+  @version 0.3.1
+=========================================================================== -->
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#cf7361">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="../assets/manifest.webmanifest">
+<link rel="apple-touch-icon" href="../assets/dad_ok.png">
+<title>重生之我在破败家族力挽狂澜</title>
+<style>
+/* ==========================================================================
+   全局：柔和暖米手账风 v0.4.0 —— 手机优先（底部标签导航 + 多模块）
+   配色：原版美术主色提取（陶土软红/暖米灰/奶油粉）+ 柔和 UI 规范
+   ========================================================================== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  min-height: 100%;
+  background: linear-gradient(180deg, #f6eee0 0%, #f1e6d2 100%);
+  color: #574a3f;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  line-height: 1.7;
+}
+#app {
+  max-width: 560px; margin: 0 auto; min-height: 100vh;
+  padding: 0 0 calc(76px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, #f8f0e2 0%, #f1e6d2 100%);
+  box-shadow: 0 0 40px rgba(166, 138, 98, .18);
+  position: relative;
+}
+@media (min-width: 640px) {
+  #app { border-left: 1px solid #e9dcc6; border-right: 1px solid #e9dcc6; }
+}
+
+/* ---- 紧凑顶栏：标题 + 周数/行动点 ---- */
+header.m-head {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  background: linear-gradient(180deg, #fbf5e9, #f6ecda);
+  border-bottom: 1px solid #e9dcc6;
+  padding: 10px 16px;
+}
+header .mh-title {
+  font-family: "Kaiti SC", "KaiTi", serif;
+  font-size: 18px; font-weight: 900; color: #c96855; letter-spacing: 2px;
+}
+header .mh-week { display: flex; align-items: center; gap: 8px; }
+header .mh-week .week {
+  color: #fff; background: linear-gradient(180deg, #d8826f, #c96855);
+  font-weight: bold; font-size: 12px;
+  padding: 2px 12px; border-radius: 999px;
+  box-shadow: 0 3px 8px rgba(207, 115, 97, .3);
+}
+header .mh-week .ap { font-size: 13px; color: #574a3f; }
+header .mh-week .ap b { color: #cf7361; letter-spacing: 2px; }
+
+/* ---- 面板容器：每次只显示一个模块 ---- */
+.panel { display: none; padding: 14px 14px 20px; }
+.panel.active { display: block; animation: panelIn .18s ease; }
+@keyframes panelIn {
+  from { opacity: .4; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- 主页：父亲病房面板 ---- */
+#dadPanel {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 12px; padding: 10px 14px 10px 10px;
+  background: #fdfaf3; border: 1px solid #e9dcc6; border-radius: 18px;
+  box-shadow: 0 6px 16px rgba(166, 138, 98, .14);
+}
+#dadImg {
+  width: 92px; height: 92px; object-fit: contain;
+  border-radius: 14px; background: #f7efe0;
+  flex-shrink: 0;
+  animation: breathe 3.4s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.dad-info { flex: 1; }
+.dad-name { font-weight: 900; font-size: 15px; margin-bottom: 2px; color: #574a3f; }
+.dad-name span { color: #cf7361; }
+#dadText { color: #9a8b77; font-size: 13px; margin-bottom: 6px; }
+.hpbar { height: 14px; border-radius: 999px; background: #f0e6d4; overflow: hidden; }
+#hpFill {
+  height: 100%; width: 50%;
+  background: linear-gradient(90deg, #e89a8a, #f2bcaa);
+  transition: width .3s;
+}
+
+/* 道具栏 */
+#itemBar { margin-bottom: 12px; font-size: 13px; color: #9a8b77; }
+#itemBar b {
+  display: inline-block; margin-right: 8px; padding: 3px 12px;
+  background: #fdfaf3; border: 1px solid #e9dcc6; border-radius: 999px;
+  color: #6b5c4d; font-size: 12px;
+  box-shadow: 0 2px 6px rgba(166, 138, 98, .12);
+}
+#itemBar b.none { opacity: .45; }
+
+/* 数值卡：两列网格 */
+#stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 10px;
+  margin-bottom: 14px;
+}
+.stat {
+  position: relative;
+  background: #fdfaf3; border: 1px solid #e9dcc6; border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(166, 138, 98, .13);
+  padding: 11px 6px 8px; text-align: center;
+  overflow: hidden;
+}
+.stat::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: var(--ac, #cf7361); opacity: .75;
+}
+.stat .label { color: #9a8b77; font-size: 12px; margin-top: 3px; }
+.stat .value { color: #52463c; font-size: 16px; font-weight: 900; line-height: 1.4; }
+.stat.warn { border-color: #e5b6ab; background: #fdf3ef; }
+.stat.warn .value { color: #c4685a; }
+.stat.good .value { color: #7a9a63; }
+.stat.flash .value { animation: statFlash .5s ease; }
+@keyframes statFlash {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.18); color: #cf7361; }
+  100% { transform: scale(1); }
+}
+
+/* 主页底部：结束本周大按钮 + 小按钮行 */
+.endweek-btn {
+  display: block; width: 100%; margin: 6px 0 10px; padding: 13px;
+  background: linear-gradient(180deg, #d8826f, #c96855);
+  color: #fff3e4; font-size: 17px; font-weight: 900; letter-spacing: 6px;
+  border: none; border-radius: 16px;
+  box-shadow: 0 6px 16px rgba(207, 115, 97, .35);
+  cursor: pointer;
+}
+.endweek-btn:active { transform: translateY(2px); box-shadow: 0 3px 8px rgba(207, 115, 97, .3); }
+.home-btnrow { display: flex; gap: 10px; }
+.home-btnrow button {
+  flex: 1; padding: 9px; font-size: 13px; font-weight: bold;
+  background: #fdfaf3; color: #7a695a; border: 1px solid #e3d5be;
+  border-radius: 12px; cursor: pointer;
+}
+.home-btnrow button:hover { background: #f7ead2; }
+.tip { color: #a3957f; font-size: 12px; margin-top: 10px; text-align: center; }
+
+/* ---- 行动分组：柔和标签 + 按钮左色条（与其他面板共用） ---- */
+#panels h3 {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: #fff; font-size: 13px; letter-spacing: 3px;
+  padding: 3px 16px; margin: 14px 0 8px;
+  border-radius: 999px;
+  box-shadow: 0 3px 8px rgba(166, 138, 98, .25);
+}
+.btnrow { display: flex; flex-wrap: wrap; gap: 10px; }
+.actbtn {
+  width: 100%; padding: 10px 13px 9px; text-align: left;
+  background: #fdfaf3; color: #52463c; border: 1px solid #e9dcc6;
+  border-left-width: 5px;
+  border-radius: 14px;
+  box-shadow: 0 4px 10px rgba(166, 138, 98, .12);
+  cursor: pointer; font-size: 14px; font-weight: bold;
+  transition: transform .1s, box-shadow .1s, background .1s;
+}
+.actbtn:hover:not(:disabled) {
+  background: #fffaef; transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(166, 138, 98, .22);
+}
+.actbtn:active:not(:disabled) { transform: translateY(0); box-shadow: 0 3px 8px rgba(166, 138, 98, .15); }
+.actbtn:disabled { opacity: .45; cursor: not-allowed; }
+.actbtn .ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--ac, #f2e6cf); font-size: 16px;
+  margin-right: 8px; vertical-align: middle;
+}
+.actbtn .hint {
+  display: none;                            /* 默认隐藏长说明，界面保持干净（v0.4.1） */
+  color: #a3957f; font-size: 11px; font-weight: normal;
+  margin-top: 4px; line-height: 1.55;
+}
+body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显示 */
+
+/* ---- 手账页 ---- */
+#tab-log .panel-pad { padding: 0; }
+#logpanel {
+  background: #fefbf4; border: 1px solid #e9dcc6; border-radius: 18px;
+  box-shadow: 0 6px 16px rgba(166, 138, 98, .14);
+  padding: 12px 16px; height: calc(100vh - 190px); overflow-y: auto;
+  font-family: "Kaiti SC", "KaiTi", serif;
+  font-size: 14px;
+}
+#logpanel p { margin: 3px 0; color: #6b5c4d; }
+#logpanel p.weekmark { color: #c0776b; font-weight: bold; margin-top: 10px; }
+
+/* ---- 底部标签栏（拇指可达） ---- */
+#tabbar {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 560px; z-index: 30;
+  display: flex;
+  background: #fdfaf3;
+  border-top: 1px solid #e9dcc6;
+  box-shadow: 0 -4px 16px rgba(166, 138, 98, .18);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+}
+#tabbar .tbtn {
+  flex: 1; border: none; background: none; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  color: #b3a48e; font-size: 11px; font-weight: bold;
+  padding: 4px 0; border-radius: 12px;
+  transition: color .12s;
+}
+#tabbar .tbtn .ticon { font-size: 22px; line-height: 1.2; }
+#tabbar .tbtn.active { color: #c96855; }
+#tabbar .tbtn.active .ticon { transform: scale(1.12); }
+
+/* ---- 弹窗 ---- */
+#overlay {
+  position: fixed; inset: 0; display: none;
+  background: rgba(90, 74, 62, .45); z-index: 50;
+  justify-content: center; align-items: center;
+  padding: 16px;
+}
+#overlay.show { display: flex; }
+.dialog {
+  width: min(540px, 100%); max-height: 86vh; overflow-y: auto;
+  background: #fdfaf3; border: 1px solid #e9dcc6; border-radius: 22px;
+  padding: 22px 22px; box-shadow: 0 20px 50px rgba(90, 74, 62, .3);
+}
+.dialog h2 { color: #c96855; font-size: 19px; margin-bottom: 12px; letter-spacing: 1px; }
+.dialog .body { white-space: pre-wrap; font-size: 14px; color: #6b5c4d; margin-bottom: 16px; }
+.dialog .choices button {
+  display: block; width: 100%; margin: 10px 0; padding: 12px 16px;
+  background: #fdfaf3; color: #52463c; border: 1px solid #e9dcc6;
+  border-radius: 14px; box-shadow: 0 4px 10px rgba(166, 138, 98, .12);
+  cursor: pointer; font-size: 14px; font-weight: bold; text-align: left;
+  transition: background .12s, transform .1s;
+}
+.dialog .choices button:hover { background: #f7ead2; transform: translateY(-2px); }
+.dialog .ending-title { font-size: 30px; text-align: center; margin: 10px 0; letter-spacing: 4px; }
+.dialog .ending-rank0 .ending-title { color: #c0776b; }
+.dialog .ending-rank2 .ending-title { color: #8fae7a; }
+.dialog .ending-rank3 .ending-title { color: #7c99b8; }
+.dialog .ending-rank4 .ending-title { color: #c99a4b; }
+.dialog .ending-rank5 .ending-title { color: #d9a95c; text-shadow: 0 2px 10px rgba(217, 169, 92, .35); }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 紧凑顶栏：标题 + 周数/行动点（所有模块共用） -->
+  <header class="m-head">
+    <div class="mh-title">破败家族</div>
+    <div class="mh-week">
+      <span class="week" id="weekLabel">第 1 周</span>
+      <span class="ap" id="apLabel"></span>
+    </div>
+  </header>
+
+  <main id="panels">
+    <!-- 模块一：主页（父亲 + 数值 + 结束本周） -->
+    <section id="tab-home" class="panel active">
+      <div id="dadPanel">
+        <img id="dadImg" src="../assets/dad_ok.png" alt="父亲">
+        <div class="dad-info">
+          <div class="dad-name">病床上的父亲 <span id="dadHpText">55 / 100</span></div>
+          <div id="dadText">病情平稳，需要持续治疗。</div>
+          <div class="hpbar"><div id="hpFill"></div></div>
+        </div>
+      </div>
+      <div id="itemBar"></div>
+      <div id="stats">
+        <div class="stat" id="stCash"><div class="label">公司账户</div><div class="value">-</div></div>
+        <div class="stat" id="stPocket"><div class="label">个人钱包</div><div class="value">-</div></div>
+        <div class="stat" id="stDebt"><div class="label">家族负债</div><div class="value">-</div></div>
+        <div class="stat" id="stHealth"><div class="label">父亲健康</div><div class="value">-</div></div>
+        <div class="stat" id="stRep"><div class="label">声望</div><div class="value">-</div></div>
+        <div class="stat" id="stMorale"><div class="label">士气</div><div class="value">-</div></div>
+        <div class="stat" id="stCharm"><div class="label">魅力</div><div class="value">-</div></div>
+        <div class="stat" id="stStaff"><div class="label">员工</div><div class="value">-</div></div>
+        <div class="stat" id="stProduct"><div class="label">产品线</div><div class="value">-</div></div>
+        <div class="stat" id="stEquip"><div class="label">设备/调查</div><div class="value">-</div></div>
+      </div>
+      <button id="btnEndWeek" class="endweek-btn">结束本周 ▶</button>
+      <div class="home-btnrow">
+        <button id="btnSave">💾 保存</button>
+        <button id="btnHints">📝 说明:关</button>
+        <button id="btnHelp">📖 玩法</button>
+        <button id="btnRestart">🔄 重开</button>
+      </div>
+      <p class="tip">每周 3 点行动点，用完点「结束本周」</p>
+    </section>
+
+    <!-- 模块二：经营（接订单/产品线/员工） -->
+    <section id="tab-biz" class="panel"><div id="actions-biz"></div></section>
+
+    <!-- 模块三：日常（家庭/人脉/投资/转账） -->
+    <section id="tab-daily" class="panel"><div id="actions-daily"></div></section>
+
+    <!-- 模块四：暗线（查真相/道具/金手指） -->
+    <section id="tab-secret" class="panel"><div id="actions-secret"></div></section>
+
+    <!-- 模块五：手账（全部日志） -->
+    <section id="tab-log" class="panel">
+      <div id="logpanel"></div>
+    </section>
+  </main>
+
+  <!-- 底部标签导航（拇指可达） -->
+  <nav id="tabbar">
+    <button class="tbtn active" data-tab="tab-home"><span class="ticon">🏡</span><span>主页</span></button>
+    <button class="tbtn" data-tab="tab-biz"><span class="ticon">🏭</span><span>经营</span></button>
+    <button class="tbtn" data-tab="tab-daily"><span class="ticon">🍵</span><span>日常</span></button>
+    <button class="tbtn" data-tab="tab-secret"><span class="ticon">🔍</span><span>暗线</span></button>
+    <button class="tbtn" data-tab="tab-log"><span class="ticon">📒</span><span>手账</span></button>
+  </nav>
+</div>
+
+<!-- 弹窗遮罩：开场说明 / 随机事件 / 结局 三种内容复用 -->
+<div id="overlay"><div class="dialog" id="dialog"></div></div>
+
+<!-- 共享引擎（顺序不能颠倒：先数据后引擎） -->
+<script src="../core/data.js"></script>
+<script src="../core/engine.js"></script>
+
+<script>
+/* ==========================================================================
+   4. 桌面端界面逻辑
+   ----------------------------------------------------------------------------
+   职责只有三件事：
+     A. 把引擎的 state 画到页面上（render 函数）
+     B. 把按钮点击翻译成引擎调用（performAction / endWeek / resolveEvent）
+     C. 用 localStorage 存档读档（键名用引擎给 SAVE_KEY，三端一致）
+   ========================================================================== */
+
+var state = null;                       // 当前的游戏进度（引擎.newGame 产生）
+
+/* ---- 视觉主题：各行动分组的主题色（按钮左色条 + 图标气泡底色） ---- */
+var GROUP_COLORS = {
+  '经营':   '#c99a4b',
+  '产品线': '#6fa098',
+  '员工':   '#c98b5e',
+  '债务':   '#c0776b',
+  '转账':   '#7c99b8',
+  '家庭':   '#8faf7e',
+  '人脉':   '#7c93b8',
+  '暗线':   '#9a85b8',
+  '投资':   '#96a86b',
+  '道具':   '#a98bc0',
+  '金手指': '#dbb160'
+};
+
+/** 数值卡配置：图标 + 顶部主题色（v0.3.2 柔和版） */
+var STAT_META = {
+  stCash:   { icon: '🏢', ac: '#c99a4b' },
+  stPocket: { icon: '👛', ac: '#dbb160' },
+  stDebt:   { icon: '⛓️', ac: '#c0776b' },
+  stHealth: { icon: '❤️', ac: '#8faf7e' },
+  stRep:    { icon: '⭐', ac: '#7c93b8' },
+  stMorale: { icon: '🔥', ac: '#c98b5e' },
+  stCharm:  { icon: '✨', ac: '#d3939f' },
+  stStaff:  { icon: '🧑‍🏭', ac: '#6fa098' },
+  stProduct:{ icon: '📦', ac: '#9a85b8' },
+  stEquip:  { icon: '🔧', ac: '#96a86b' }
+};
+
+/** 记录上一帧的数值文本，用于"变化闪光"动画 */
+var prevStatText = {};
+
+/** 快捷取 DOM */
+function $(id) { return document.getElementById(id); }
+
+/* ---- 存档 / 读档 ------------------------------------------------------- */
+function saveGame() {
+  try { localStorage.setItem(Engine.SAVE_KEY, JSON.stringify(state)); }
+  catch (e) { console.warn('存档失败（可能处于无痕模式）', e); }
+}
+function loadGame() {
+  try {
+    var raw = localStorage.getItem(Engine.SAVE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+/* ---- 渲染：状态栏 ------------------------------------------------------ */
+function render() {
+  $('weekLabel').textContent = '第 ' + Math.min(state.week, CONFIG.MAX_WEEKS) + ' / ' + CONFIG.MAX_WEEKS + ' 周';
+
+  // 行动点用圆点表示：●●○
+  var dots = '';
+  for (var i = 0; i < CONFIG.AP_PER_WEEK; i++) { dots += (i < state.ap) ? '●' : '○'; }
+  $('apLabel').innerHTML = '行动点 <b>' + dots + '</b>';
+
+  // 父亲病房面板：插画随健康分三档切换，配一句状态文案 + 血条式健康条
+  var tier = state.health >= 70 ? 'happy' : (state.health >= 40 ? 'ok' : 'sick');
+  $('dadImg').src = '../assets/dad_' + tier + '.png';
+  $('dadHpText').textContent = state.health + ' / 100';
+  $('dadText').textContent =
+    tier === 'happy' ? '今天精神不错，还念叨着要下床去车间看看。' :
+    tier === 'ok'    ? '病情平稳，每周的治疗一天都不能断。' :
+                       '咳嗽得厉害，夜里总睡不安——他需要更好的治疗。';
+  $('hpFill').style.width = state.health + '%';
+
+  // 道具栏：显示三种道具的持有数量
+  var it = state.items || {};
+  $('itemBar').innerHTML = '随身道具：'
+    + '<b' + (it.aid > 0 ? '' : ' class="none"') + '>🧰 急救箱 ×' + (it.aid || 0) + '</b>'
+    + '<b' + (it.invite > 0 ? '' : ' class="none"') + '>📨 商务邀请函 ×' + (it.invite || 0) + '</b>'
+    + '<b' + (it.chicken > 0 ? '' : ' class="none"') + '>⏱️ 时光怀表 ×' + (it.chicken || 0) + '</b>';
+
+  setStat('stCash', Engine.money(state.cash), state.cash < CONFIG.WEEKLY_WAGE * 2 ? 'warn' : '');
+  setStat('stPocket', Engine.money(state.pocket), state.pocket < CONFIG.MEDICAL_COST ? 'warn' : '');
+  setStat('stDebt', Engine.money(state.debt), state.debt > CONFIG.DEBT_CRUSH * 0.8 ? 'warn' : '');
+  // 父亲健康配一个表情：😄(健康) → 🙂(还行) → 😖(危急)，一眼看出状况
+  var face = state.health >= 70 ? '😄' : (state.health >= 40 ? '🙂' : '😖');
+  setStat('stHealth', face + ' ' + state.health, state.health <= 30 ? 'warn' : (state.health >= 70 ? 'good' : ''));
+  setStat('stRep', state.reputation + ' / 100', '');
+  setStat('stMorale', state.morale + ' / 100', state.morale <= 30 ? 'warn' : '');
+  setStat('stCharm', state.charm + ' / 100', '');
+  setStat('stStaff', (state.staff || 0) + ' / ' + CONFIG.STAFF_MAX, '');
+  setStat('stProduct', productLevelText(), '');
+  setStat('stEquip', 'Lv.' + state.equipment + ' · ' + state.investigation + '%', '');
+
+  renderActions();
+  renderLog();
+
+  // 结局弹窗优先级最高
+  if (state.ended) { showEnding(); return; }
+  // 有待处理事件 → 强制弹事件窗（此时行动按钮已全部禁用）
+  if (state.pendingEvent) { showEvent(state.pendingEvent); return; }
+  hideOverlay();
+}
+
+/** 产品线等级显示：如 "1·0·2"（果脯/罐头/礼盒），配合 PRODUCTS 数据顺序 */
+function productLevelText() {
+  var p = state.products || {};
+  var out = [];
+  for (var i = 0; i < PRODUCTS.length; i++) { out.push(p[PRODUCTS[i].id] || 0); }
+  return out.join('·');
+}
+
+/** 更新单个数值卡片（图标注入 + 主题色 + 数值变化闪光） */
+function setStat(id, text, cls) {
+  var el = $(id);
+  var meta = STAT_META[id] || {};
+  var valEl = el.querySelector('.value');
+  var labEl = el.querySelector('.label');
+  // 图标进标签行（只注入一次）
+  if (meta.icon && labEl && labEl.getAttribute('data-icon') !== meta.icon) {
+    labEl.setAttribute('data-icon', meta.icon);
+    labEl.innerHTML = meta.icon + ' ' + labEl.textContent;
+  }
+  if (meta.ac) { el.style.setProperty('--ac', meta.ac); }
+  // 数值变化 → 闪光动画
+  if (valEl.textContent !== '-' && prevStatText[id] !== undefined && prevStatText[id] !== text) {
+    el.classList.remove('flash');
+    void el.offsetWidth;                    // 强制重排以重启动画
+    el.classList.add('flash');
+  }
+  prevStatText[id] = text;
+  valEl.textContent = text;
+  el.className = 'stat' + (cls ? ' ' + cls : '');
+  if (meta.ac) { el.style.setProperty('--ac', meta.ac); }   // className 重置后补回主题色
+}
+
+/* ---- 渲染：行动按钮（按数据分组 → 分发到对应底部标签页） ---------------- */
+/** 分组 → 底部标签 的归属（改分组名记得同步这里） */
+var GROUP_TAB = {
+  '经营': 'actions-biz', '产品线': 'actions-biz', '员工': 'actions-biz',
+  '家庭': 'actions-daily', '人脉': 'actions-daily', '投资': 'actions-daily', '转账': 'actions-daily',
+  '暗线': 'actions-secret', '道具': 'actions-secret', '金手指': 'actions-secret'
+};
+
+function renderActions() {
+  var boxes = {
+    'actions-biz': $('actions-biz'),
+    'actions-daily': $('actions-daily'),
+    'actions-secret': $('actions-secret')
+  };
+  Object.keys(boxes).forEach(function (k) { boxes[k].innerHTML = ''; });
+
+  var groups = {};
+  ACTIONS.forEach(function (a) {
+    (groups[a.group] = groups[a.group] || []).push(a);
+  });
+
+  Object.keys(groups).forEach(function (g) {
+    var box = boxes[GROUP_TAB[g]] || boxes['actions-biz'];
+    var h = document.createElement('h3'); h.textContent = g;
+    var color = GROUP_COLORS[g] || '#cf7361';
+    h.style.background = color;             // 分组标签用主题色
+    var row = document.createElement('div'); row.className = 'btnrow';
+    groups[g].forEach(function (a) {
+      var b = document.createElement('button');
+      b.className = 'actbtn';
+      b.style.borderLeftColor = color;      // 按钮左侧粗色条 = 分组主题色
+      b.style.setProperty('--ac', color + '33');  // 图标气泡底色（主题色 20% 透明）
+      b.innerHTML = '<span class="ic">' + a.icon + '</span>' + a.name
+                  + '<span class="hint">' + a.desc + '</span>';
+      var check = Engine.canUseAction(state, a.id);
+      b.disabled = !check.ok;
+      if (!check.ok) { b.title = check.reason; }
+      b.onclick = function () { doAction(a.id); };
+      row.appendChild(b);
+    });
+    box.appendChild(h); box.appendChild(row);
+  });
+}
+
+/* ---- 渲染：日志（从 state.log 全量重画，简单可靠） --------------------- */
+function renderLog() {
+  var panel = $('logpanel');
+  panel.innerHTML = '';
+  state.log.forEach(function (line) {
+    var p = document.createElement('p');
+    if (/^——/.test(line) || /^【第/.test(line)) { p.className = 'weekmark'; }
+    p.textContent = line;
+    panel.appendChild(p);
+  });
+  panel.scrollTop = panel.scrollHeight;   // 自动滚到最新
+}
+
+/* ---- 玩家操作 ---------------------------------------------------------- */
+function doAction(id) {
+  var r = Engine.performAction(state, id);
+  if (r.error) { alert(r.error); return; }
+  saveGame();
+  render();
+}
+
+/** 结束本周：可能触发事件（弹窗），也可能直接进入下一周 */
+function onEndWeek() {
+  if (state.pendingEvent || state.ended) { return; }
+  var r = Engine.endWeek(state);
+  saveGame();
+  render();
+  if (r.event) { showEvent(r.event); }    // render 里也会弹，这里兜底
+}
+
+/** 在事件弹窗里点了一个选项 */
+function onChoose(idx) {
+  Engine.resolveEvent(state, idx);
+  saveGame();
+  render();
+}
+
+/* ---- 弹窗们 ------------------------------------------------------------ */
+function showEvent(ev) {
+  var d = $('dialog');
+  var btns = ev.options.map(function (o, i) {
+    return '<button onclick="onChoose(' + i + ')">' + o.label + '</button>';
+  }).join('');
+  d.innerHTML = '<h2>❗ ' + ev.title + '</h2>'
+              + '<div class="body">' + ev.text + '</div>'
+              + '<div class="choices">' + btns + '</div>';
+  $('overlay').classList.add('show');
+}
+
+function showEnding() {
+  var e = ENDINGS[state.ending] || { title: state.ending, text: '', rank: 0 };
+  var d = $('dialog');
+  var truth = (state.investigation >= CONFIG.TRUTH_NEED) ? '（调查进度 ' + state.investigation + '%，真相已明）' : '';
+  // 结局配图：好结局父亲露出笑容；父亲病逝线用病容；其余按健康选
+  var dadArt = 'dad_ok.png';
+  if (state.ending === 'father_lost') { dadArt = 'dad_sick.png'; }
+  else if (e.rank >= 3 && state.health >= 60) { dadArt = 'dad_happy.png'; }
+  else if (state.health < 40) { dadArt = 'dad_sick.png'; }
+  // 成就汇总（0.2.0）
+  var unlocked = [];
+  for (var key in (state.flags.achievements || {})) {
+    if (state.flags.achievements.hasOwnProperty(key)) {
+      for (var ai = 0; ai < ACHIEVEMENTS.length; ai++) {
+        if (ACHIEVEMENTS[ai].id === key) { unlocked.push(ACHIEVEMENTS[ai].name); }
+      }
+    }
+  }
+  var achLine = unlocked.length
+    ? '<div class="body" style="color:#b8742c;font-size:13px">🏆 本局成就 ' + unlocked.length + '/'
+      + ACHIEVEMENTS.length + '：' + unlocked.join('、') + '</div>'
+    : '<div class="body" style="color:#8a7a63;font-size:12px">本局没有解锁成就——下一局试试还债、查真相或攒魅力？</div>';
+  d.innerHTML = '<div class="ending-title">—— 结局 ——</div>'
+              + '<img src="../assets/' + dadArt + '" alt="父亲" '
+              + 'style="display:block;margin:0 auto 8px;width:150px;border:3px solid #2f2a26;border-radius:14px;background:#f6ecd9">'
+              + '<h2 class="ending-rank' + e.rank + '" style="text-align:center">' + e.title + '</h2>'
+              + '<div class="body">' + e.text + '</div>'
+              + '<div class="body" style="color:#8a8577;font-size:12px">'
+              + '最终数据：撑过 ' + Math.min(state.week, CONFIG.MAX_WEEKS) + ' 周 · '
+              + '剩余债务 ' + Engine.money(state.debt) + ' · '
+              + '父亲健康 ' + state.health + ' · 声望 ' + state.reputation + truth + '</div>'
+              + achLine
+              + '<div class="choices"><button onclick="startNew()">再来一局</button></div>';
+  $('overlay').classList.add('show');
+}
+
+function showStart() {
+  var d = $('dialog');
+  d.innerHTML = '<img src="../assets/hero.png" alt="主视觉" '
+    + 'style="width:100%;border:3px solid #2f2a26;border-radius:12px;margin-bottom:14px;background:#f6ecd9">'
+    + '<h2>重生之我在破败家族力挽狂澜</h2>'
+    + '<div class="body">你死于家族破产清算的那个雨夜，一睁眼，回到了三年前——'
+    + '老厂还在，父亲还没倒下，而三叔的野心刚刚冒头。\n\n'
+    + '你有 24 周、每周 3 个行动点。\n'
+    + '经营老厂、偿还巨债、为父亲治病、查出真相——然后，改写结局。\n\n'
+    + '<span style="color:#8a8577">提示：每周至少支付一次医疗费，否则父亲健康会恶化；'
+    + '「启动先知记忆」可以提前窥探危机，全局限 3 次。</span></div>'
+    + '<div class="choices">'
+    + '<button onclick="startNew()">▶ 开始新的挣扎</button>'
+    + '<button id="btnContinue" style="display:none">↻ 继续上局的进度</button>'
+    + '</div>';
+  $('overlay').classList.add('show');
+  var saved = loadGame();
+  if (saved && !saved.ended) {
+    $('btnContinue').style.display = 'block';
+    $('btnContinue').onclick = function () {
+      state = saved;
+      render();
+    };
+  }
+}
+
+function showHelp() {
+  var d = $('dialog');
+  d.innerHTML = '<h2>玩法说明</h2><div class="body">'
+    + '◆ 每周 3 个行动点，用完点「结束本周」结算；转账和道具不耗行动点。\n'
+    + '◆ 双资金体系：公司账户管经营（订单/还债/工资），个人钱包管家事（医疗/投机/道具）；'
+    + '钱包不够先在「转账」组从公司调钱（10% 手续费）。\n'
+    + '◆ 结算时自动发生：债务计息（0.5%）、发工资、周薪 8000 进钱包；'
+    + '若本周没付过医疗费则父亲健康下降。\n'
+    + '◆ 魅力值靠社交行动积累，能让订单越赚越多。\n'
+    + '◆ 周末可能触发事件：普通周有 35% 概率，第 4/8/12/16/20/24 周必定触发危机。\n'
+    + '◆ 坚持到第 24 周结束，按你的表现评定结局（共 9 种）+ 成就结算。\n'
+    + '◆ 三个失败红线：父亲健康归零；选择卖厂；作恶太多（会进局子）。\n'
+    + '◆ 隐藏真结局：还清债务 + 查明真相 + 父亲健康 70+ + 声望 60+。</div>'
+    + '<div class="choices"><button onclick="render()">知道了</button></div>';
+  $('overlay').classList.add('show');
+}
+
+function hideOverlay() { $('overlay').classList.remove('show'); }
+
+/* ---- 底部标签导航（手机版多模块切换） ---------------------------------- */
+function switchTab(tabId) {
+  document.querySelectorAll('#panels .panel').forEach(function (p) {
+    p.classList.toggle('active', p.id === tabId);
+  });
+  document.querySelectorAll('#tabbar .tbtn').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-tab') === tabId);
+  });
+  window.scrollTo(0, 0);
+}
+
+/* ---- 开新局 ------------------------------------------------------------ */
+function startNew() {
+  state = Engine.newGame();
+  saveGame();
+  render();
+}
+
+/* ---- 顶部系统按钮 + 底部标签栏 ---------------------------------------- */
+$('btnEndWeek').onclick = onEndWeek;
+$('btnSave').onclick = function () { saveGame(); alert('已保存。'); };
+$('btnHelp').onclick = showHelp;
+$('btnRestart').onclick = function () {
+  if (confirm('确定放弃当前进度、重新开始吗？')) { startNew(); }
+};
+
+/* ---- 说明开关：默认收起按钮下的长文案，界面更干净（偏好会记住） -------- */
+function applyHints(on) {
+  document.body.classList.toggle('show-hints', on);
+  $('btnHints').textContent = on ? '📝 说明:开' : '📝 说明:关';
+  try { localStorage.setItem('cs_show_hints', on ? '1' : '0'); } catch (e) {}
+}
+$('btnHints').onclick = function () {
+  applyHints(!document.body.classList.contains('show-hints'));
+};
+try { applyHints(localStorage.getItem('cs_show_hints') === '1'); } catch (e) { applyHints(false); }
+
+document.querySelectorAll('#tabbar .tbtn').forEach(function (b) {
+  b.onclick = function () { switchTab(b.getAttribute('data-tab')); };
+});
+
+/* ---- 入口：显示开场画面 ------------------------------------------------ */
+showStart();
+</script>
+</body>
+</html>
