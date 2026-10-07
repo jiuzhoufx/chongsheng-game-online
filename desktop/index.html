@@ -136,6 +136,13 @@ header .mh-week .ap b { color: #cf7361; letter-spacing: 2px; }
 }
 .stat .label { color: #9a8b77; font-size: 12px; margin-top: 3px; }
 .stat .value { color: #52463c; font-size: 16px; font-weight: 900; line-height: 1.4; }
+/* 迷你进度条（0~100 的属性用"条"代替纯数字，学自 Progress Knight） */
+.stat .sbar {
+  display: block; height: 5px; border-radius: 999px;
+  background: #f0e6d4; margin-top: 6px; overflow: hidden;
+}
+.stat .sbar b { display: block; height: 100%; width: 0; background: var(--ac, #cf7361); opacity: .8; transition: width .3s; }
+.stat.warn .sbar b { background: #cf7361; }
 .stat.warn { border-color: #e5b6ab; background: #fdf3ef; }
 .stat.warn .value { color: #c4685a; }
 .stat.good .value { color: #7a9a63; }
@@ -158,9 +165,9 @@ header .mh-week .ap b { color: #cf7361; letter-spacing: 2px; }
 .endweek-btn:active { transform: translateY(2px); box-shadow: 0 3px 8px rgba(207, 115, 97, .3); }
 .home-btnrow { display: flex; gap: 10px; }
 .home-btnrow button {
-  flex: 1; padding: 9px; font-size: 13px; font-weight: bold;
+  flex: 1; padding: 9px 4px; font-size: 12px; font-weight: bold;
   background: #fdfaf3; color: #7a695a; border: 1px solid #e3d5be;
-  border-radius: 12px; cursor: pointer;
+  border-radius: 12px; cursor: pointer; white-space: nowrap;
 }
 .home-btnrow button:hover { background: #f7ead2; }
 .tip { color: #a3957f; font-size: 12px; margin-top: 10px; text-align: center; }
@@ -201,6 +208,16 @@ header .mh-week .ap b { color: #cf7361; letter-spacing: 2px; }
   margin-top: 4px; line-height: 1.55;
 }
 body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显示 */
+
+/* 一行式成本/收益标注（v0.5.1） */
+.actbtn .tok {
+  float: right; margin-left: 8px; margin-top: 2px;
+  font-size: 11px; font-weight: 900; padding: 1px 9px; border-radius: 999px;
+}
+.actbtn .tok.gain { background: #e8f0dd; color: #6b8f4e; }
+.actbtn .tok.cost { background: #f2e6cf; color: #8a6f45; }
+.actbtn .tok.lack { background: #f6ded7; color: #b5574a; }
+.actbtn .tok.dim  { background: #f0ead9; color: #a3957f; }
 
 /* ---- 手账页 ---- */
 #tab-log .panel-pad { padding: 0; }
@@ -341,9 +358,9 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
 <!-- 弹窗遮罩：开场说明 / 随机事件 / 结局 三种内容复用 -->
 <div id="overlay"><div class="dialog" id="dialog"></div></div>
 
-<!-- 共享引擎（顺序不能颠倒：先数据后引擎） -->
-<script src="../core/data.js"></script>
-<script src="../core/engine.js"></script>
+<!-- 共享引擎（顺序不能颠倒：先数据后引擎）。?v= 用于发布时强制刷新缓存 -->
+<script src="../core/data.js?v=051"></script>
+<script src="../core/engine.js?v=051"></script>
 
 <script>
 /* ==========================================================================
@@ -447,6 +464,16 @@ function render() {
   setStat('stProduct', productLevelText(), '');
   setStat('stEquip', 'Lv.' + state.equipment + ' · ' + state.investigation + '%', '');
 
+  // 迷你进度条：0~100 的属性用"条"读（学自 Progress Knight）
+  setBar('stHealth', state.health);
+  setBar('stRep', state.reputation);
+  setBar('stMorale', state.morale);
+  setBar('stCharm', state.charm);
+  setBar('stStaff', (state.staff || 0) / CONFIG.STAFF_MAX * 100);
+  var pt = 0; for (var pk in state.products) { if (state.products.hasOwnProperty(pk)) { pt += state.products[pk]; } }
+  setBar('stProduct', pt / 9 * 100);
+  setBar('stEquip', state.investigation);
+
   renderActions();
   renderLog();
 
@@ -463,6 +490,19 @@ function productLevelText() {
   var out = [];
   for (var i = 0; i < PRODUCTS.length; i++) { out.push(p[PRODUCTS[i].id] || 0); }
   return out.join('·');
+}
+
+/** 给数值卡注入迷你进度条（只在首次调用时创建 DOM） */
+function setBar(id, pct) {
+  var el = $(id);
+  var bar = el.querySelector('.sbar');
+  if (!bar) {
+    bar = document.createElement('i');
+    bar.className = 'sbar';
+    bar.innerHTML = '<b></b>';
+    el.appendChild(bar);
+  }
+  bar.firstChild.style.width = Math.max(0, Math.min(100, pct)) + '%';
 }
 
 /** 更新单个数值卡片（图标注入 + 主题色 + 数值变化闪光） */
@@ -497,6 +537,58 @@ var GROUP_TAB = {
   '暗线': 'actions-secret', '道具': 'actions-secret', '金手指': 'actions-secret'
 };
 
+/**
+ * 按钮上的一行式标注（v0.5.1，学自增量游戏）：
+ * 成本/收益/库存直接标在按钮名字后面，不点开就知道值不值。
+ * 返回 { text, cls }：cls = 'gain'(绿色收益) | 'cost'(成本) | 'dim'(中性)。
+ * 成本类如果当前付不起，cls 变 'lack'（红色警示）。
+ */
+function tokenFor(action) {
+  var s = state, id = action.id, C = CONFIG;
+  function lackCash(n) { return s.cash < n; }
+  function lackPocket(n) { return s.pocket < n; }
+  switch (id) {
+    case 'order':       return { text: '+' + Engine.money(Engine.estimateOrder(s)), cls: 'gain' };
+    case 'buy_material': return { text: money(15000), cls: lackCash(15000) ? 'lack' : 'cost' };
+    case 'upgrade':     return { text: money(Engine.upgradeCost(s)), cls: lackCash(Engine.upgradeCost(s)) ? 'lack' : 'cost' };
+    case 'booth':       return { text: '+2000', cls: 'gain' };
+    case 'develop_gua':
+    case 'develop_guan':
+    case 'develop_lihe': {
+      var pid = id.replace('develop_', '');
+      var prod = Engine.findProduct(pid);
+      var lv = s.products[pid] || 0;
+      if (lv >= 3) { return { text: '已满级', cls: 'dim' }; }
+      var c = Engine.productCost(prod, lv);
+      return { text: money(c), cls: lackCash(c) ? 'lack' : 'cost' };
+    }
+    case 'hire_staff':  return s.staff >= C.STAFF_MAX ? { text: '满员', cls: 'dim' }
+      : { text: money(C.STAFF_HIRE_COST), cls: lackCash(C.STAFF_HIRE_COST) ? 'lack' : 'cost' };
+    case 'fire_staff':  return s.staff <= 0 ? { text: '无人', cls: 'dim' } : { text: '省' + money(C.STAFF_WEEKLY_WAGE) + '/周', cls: 'gain' };
+    case 'negotiate':   return { text: '本周免息', cls: 'gain' };
+    case 'repay':       return s.debt <= 0 ? { text: '无债', cls: 'dim' }
+      : { text: money(Math.min(C.REPAY_AMOUNT, s.debt)), cls: lackCash(Math.min(C.REPAY_AMOUNT, s.debt)) ? 'lack' : 'cost' };
+    case 'transfer_s':  return { text: '实到4.5万', cls: lackCash(C.TRANSFER_S_AMOUNT) ? 'lack' : 'cost' };
+    case 'transfer_l':  return { text: '实到18万', cls: lackCash(C.TRANSFER_L_AMOUNT) ? 'lack' : 'cost' };
+    case 'care':        return { text: '❤+8', cls: 'gain' };
+    case 'medical': {
+      var mc = Engine.medicalCost(s);
+      return { text: money(mc), cls: lackPocket(mc) ? 'lack' : 'cost' };
+    }
+    case 'chamber':     return { text: '声望+4', cls: 'gain' };
+    case 'media':       return { text: '声望+8', cls: 'gain' };
+    case 'investigate': return { text: '+' + (10) + '~18%', cls: 'gain' };
+    case 'invest_low':  return { text: money(C.INVEST_LOW_AMOUNT), cls: lackPocket(C.INVEST_LOW_AMOUNT) ? 'lack' : 'cost' };
+    case 'invest_high': return { text: money(C.INVEST_HIGH_AMOUNT), cls: lackPocket(C.INVEST_HIGH_AMOUNT) ? 'lack' : 'cost' };
+    case 'use_aid':     return (s.items.aid > 0) ? { text: '×' + s.items.aid, cls: 'gain' } : { text: '×0', cls: 'dim' };
+    case 'use_invite':  return (s.items.invite > 0) ? { text: '×' + s.items.invite, cls: 'gain' } : { text: '×0', cls: 'dim' };
+    case 'buy_chicken': return { text: money(C.CHICKEN_COST), cls: lackCash(C.CHICKEN_COST) ? 'lack' : 'cost' };
+    case 'use_chicken': return (s.items.chicken > 0 && s.history.length > 0) ? { text: '可回溯', cls: 'gain' } : { text: '不可用', cls: 'dim' };
+    case 'foresight':   return { text: '剩' + s.foresight + '次', cls: s.foresight > 0 ? 'gain' : 'dim' };
+    default:            return null;
+  }
+}
+
 function renderActions() {
   var boxes = {
     'actions-biz': $('actions-biz'),
@@ -521,7 +613,10 @@ function renderActions() {
       b.className = 'actbtn';
       b.style.borderLeftColor = color;      // 按钮左侧粗色条 = 分组主题色
       b.style.setProperty('--ac', color + '33');  // 图标气泡底色（主题色 20% 透明）
-      b.innerHTML = '<span class="ic">' + a.icon + '</span>' + a.name
+      // 一行式标注：成本/收益直接标在名字后（买不起自动变红）
+      var tok = tokenFor(a);
+      var tokHtml = tok ? '<span class="tok ' + tok.cls + '">' + tok.text + '</span>' : '';
+      b.innerHTML = '<span class="ic">' + a.icon + '</span>' + a.name + tokHtml
                   + '<span class="hint">' + a.desc + '</span>';
       var check = Engine.canUseAction(state, a.id);
       b.disabled = !check.ok;

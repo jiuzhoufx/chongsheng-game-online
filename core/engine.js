@@ -265,6 +265,19 @@ function productLevels(state) {
   return total;
 }
 
+/**
+ * 预估"接订单"的收益（v0.5.1 新增，学自增量游戏"按钮上直接标收益"）。
+ * 接订单没有随机成分，所以预估值 = 实际值；供界面在按钮上标一行 token。
+ */
+function estimateOrder(state) {
+  var gain = 20000 + state.reputation * 600 + state.morale * 100;
+  var inv = Math.min(state.inventory || 0, 1) > 0 ? state.inventory : 0;
+  if (inv > 0) { gain = gain * (1 + 0.3 * inv); }
+  gain = gain * (1 + 0.25 * ((state.equipment || 1) - 1)) * (1 + (state.charm || 0) * 0.004);
+  gain = gain * (1 + 0.15 * productLevels(state)) * (1 + 0.08 * (state.staff || 0));
+  return Math.round(gain);
+}
+
 /* ===========================================================================
  * 四、执行行动
  * ======================================================================== */
@@ -856,7 +869,8 @@ var Engine = {
   medicalCost: medicalCost,
   productLevels: productLevels,
   findProduct: findProduct,
-  productCost: productCost
+  productCost: productCost,
+  estimateOrder: estimateOrder
 };
 
 if (typeof module !== 'undefined' && module.exports) {
