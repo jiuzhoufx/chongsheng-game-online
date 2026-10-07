@@ -57,6 +57,12 @@ header .mh-title {
   font-size: 18px; font-weight: 900; color: #c96855; letter-spacing: 2px;
 }
 header .mh-week { display: flex; align-items: center; gap: 8px; }
+header .mh-crisis {
+  font-size: 11px; font-weight: bold; color: #b56a5c;
+  background: #fbeae5; border: 1px solid #ecccc2;
+  border-radius: 999px; padding: 2px 9px;
+}
+header .mh-crisis:empty { display: none; }
 header .mh-week .week {
   color: #fff; background: linear-gradient(180deg, #d8826f, #c96855);
   font-weight: bold; font-size: 12px;
@@ -267,6 +273,7 @@ body.show-hints .actbtn .hint { display: block; }   /* 点"说明"开关后显�
   <header class="m-head">
     <div class="mh-title">破败家族</div>
     <div class="mh-week">
+      <span class="mh-crisis" id="crisisChip"></span>
       <span class="week" id="weekLabel">第 1 周</span>
       <span class="ap" id="apLabel"></span>
     </div>
@@ -400,6 +407,10 @@ function loadGame() {
 /* ---- 渲染：状态栏 ------------------------------------------------------ */
 function render() {
   $('weekLabel').textContent = '第 ' + Math.min(state.week, CONFIG.MAX_WEEKS) + ' / ' + CONFIG.MAX_WEEKS + ' 周';
+
+  // 危机倒计时提示（学自开源文字游戏的常驻关键信息条）
+  var nc = Engine.nextCrisisWeek(state);
+  $('crisisChip').textContent = nc ? '⚠ 危机 ' + nc + ' 周' : '';
 
   // 行动点用圆点表示：●●○
   var dots = '';
@@ -610,14 +621,11 @@ function showEnding() {
 function showStart() {
   var d = $('dialog');
   d.innerHTML = '<img src="../assets/hero.png" alt="主视觉" '
-    + 'style="width:100%;border:3px solid #2f2a26;border-radius:12px;margin-bottom:14px;background:#f6ecd9">'
+    + 'style="width:100%;border:1px solid #e9dcc6;border-radius:16px;margin-bottom:14px;background:#f6ecd9">'
     + '<h2>重生之我在破败家族力挽狂澜</h2>'
-    + '<div class="body">你死于家族破产清算的那个雨夜，一睁眼，回到了三年前——'
-    + '老厂还在，父亲还没倒下，而三叔的野心刚刚冒头。\n\n'
-    + '你有 24 周、每周 3 个行动点。\n'
-    + '经营老厂、偿还巨债、为父亲治病、查出真相——然后，改写结局。\n\n'
-    + '<span style="color:#8a8577">提示：每周至少支付一次医疗费，否则父亲健康会恶化；'
-    + '「启动先知记忆」可以提前窥探危机，全局限 3 次。</span></div>'
+    + '<div class="body">你死于家族破产清算的雨夜，一睁眼回到三年前——老厂还在，父亲没倒，三叔刚露出獠牙。\n\n'
+    + '<b>48 周，每周 3 点行动点。</b>\n'
+    + '经营、还债、治病、查真相——改写结局。</div>'
     + '<div class="choices">'
     + '<button onclick="startNew()">▶ 开始新的挣扎</button>'
     + '<button id="btnContinue" style="display:none">↻ 继续上局的进度</button>'
@@ -635,17 +643,10 @@ function showStart() {
 
 function showHelp() {
   var d = $('dialog');
-  d.innerHTML = '<h2>玩法说明</h2><div class="body">'
-    + '◆ 每周 3 个行动点，用完点「结束本周」结算；转账和道具不耗行动点。\n'
-    + '◆ 双资金体系：公司账户管经营（订单/还债/工资），个人钱包管家事（医疗/投机/道具）；'
-    + '钱包不够先在「转账」组从公司调钱（10% 手续费）。\n'
-    + '◆ 结算时自动发生：债务计息（0.5%）、发工资、周薪 8000 进钱包；'
-    + '若本周没付过医疗费则父亲健康下降。\n'
-    + '◆ 魅力值靠社交行动积累，能让订单越赚越多。\n'
-    + '◆ 周末可能触发事件：普通周有 35% 概率，第 4/8/12/16/20/24 周必定触发危机。\n'
-    + '◆ 坚持到第 24 周结束，按你的表现评定结局（共 9 种）+ 成就结算。\n'
-    + '◆ 三个失败红线：父亲健康归零；选择卖厂；作恶太多（会进局子）。\n'
-    + '◆ 隐藏真结局：还清债务 + 查明真相 + 父亲健康 70+ + 声望 60+。</div>'
+  d.innerHTML = '<h2>玩法（3 行说完）</h2><div class="body">'
+    + '① 每周 3 点行动点，在「经营/日常/暗线」页签里用，点「结束本周」结算（利息/工资/医疗）。\n'
+    + '② 公司账户管经营，个人钱包管医疗和投机；转账收 10% 手续费。\n'
+    + '③ 第 4 周起每 4 周一场危机，拍卖会在 6/14/22/30/38/46 周。共 9 种结局——真结局：清债+真相+健康70+声望60。</div>'
     + '<div class="choices"><button onclick="render()">知道了</button></div>';
   $('overlay').classList.add('show');
 }
